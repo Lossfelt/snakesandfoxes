@@ -77,7 +77,7 @@ main{width:100%;max-width:650px;padding:5px 12px 46px;display:flex;flex-directio
 
 /* board pieces and interaction */
 .piece{transition:transform .28s cubic-bezier(.2,.7,.2,1),filter .18s ease,opacity .18s ease;transform-box:fill-box;transform-origin:center;will-change:transform}
-.dark-piece{transition:transform .36s cubic-bezier(.18,.72,.18,1),filter .18s ease,opacity .18s ease;will-change:transform}
+.dark-piece{transition:transform 500ms cubic-bezier(.18,.72,.18,1),filter .18s ease,opacity .18s ease;will-change:transform}
 .dark-piece.enemy-moving{filter:url(#pieceShadow) drop-shadow(0 0 9px rgba(255,214,133,.78))}
 .tapnode{fill:transparent;cursor:pointer}
 .tapnode:focus{outline:none;fill:rgba(239,190,84,.12);stroke:var(--bronze-pale);stroke-width:3.2;filter:url(#softGlow)}
@@ -104,7 +104,7 @@ main{width:100%;max-width:650px;padding:5px 12px 46px;display:flex;flex-directio
 .dark-piece{outline:none}
 .dark-piece.bind-target{cursor:pointer;transition:none;filter:url(#pieceShadow) drop-shadow(0 0 9px rgba(239,190,84,.96));animation:bindTarget 1.05s ease-in-out infinite}
 .dark-piece.bind-target:focus{filter:url(#pieceShadow) drop-shadow(0 0 13px rgba(255,232,164,1))}
-.fox-hopping{transition:transform .26s cubic-bezier(.16,.76,.18,1),filter .2s ease,opacity .18s ease;filter:url(#pieceShadow) drop-shadow(0 -9px 7px rgba(255,231,172,.82))}
+.fox-hopping{transition:transform 500ms cubic-bezier(.16,.76,.18,1),filter .2s ease,opacity .18s ease;filter:url(#pieceShadow) drop-shadow(0 -9px 7px rgba(255,231,172,.82))}
 .fox-over-marker{fill:rgba(131,193,214,.12);stroke:#8ec7da;stroke-width:3;stroke-dasharray:6 4;filter:url(#softGlow)}
 .fox-over-core{fill:none;stroke:rgba(221,243,250,.9);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round;filter:url(#softGlow)}
 .fox-land-marker{fill:rgba(239,190,84,.12);stroke:#efbe54;stroke-width:3.8;filter:url(#softGlow);animation:legalPulse 1s ease-in-out infinite}

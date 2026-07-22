@@ -1156,15 +1156,16 @@ document.addEventListener('keydown',event => {
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve,milliseconds));
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ENEMY_TIMING = Object.freeze({
-  aggregateStep:310,
-  tideSnakeStep:250,
-  tideFoxStep:310,
-  symbolSnakeStep:330,
-  foxToMid:210,
-  foxMidPause:45,
-  foxToLand:420,
-  blindPause:760
+  transition:500,
+  nodePause:200
 });
+async function waitAtEnemyNode(version){
+  if (reduceMotion) return version === gameVersion;
+  await sleep(ENEMY_TIMING.transition);
+  if (version !== gameVersion) return false;
+  await sleep(ENEMY_TIMING.nodePause);
+  return version === gameVersion;
+}
 function logCaptures(indices,type,landing = false){
   for (const index of indices){
     const name = index === 0 ? 'I' : 'II';
@@ -1182,23 +1183,23 @@ function moveSnakeOneLive(index,adj,matrix){
   if (result.captured.length) logCaptures(result.captured,'S',false);
   return result.moved;
 }
-async function animateDarkStepLive(choice,adj,matrix,version,duration){
+async function animateDarkStepLive(choice,adj,matrix,version){
   const piece = dark[choice.index];
   piece.el.classList.add('enemy-moving');
   const moved = moveDarkOneLive(choice,adj,matrix);
   if (!moved){ piece.el.classList.remove('enemy-moving'); return {moved:false,cancelled:false}; }
   renderAll();
-  if (!reduceMotion){ await sleep(duration); if (version !== gameVersion) return {moved:true,cancelled:true}; }
+  if (!await waitAtEnemyNode(version)) return {moved:true,cancelled:true};
   piece.el.classList.remove('enemy-moving');
   return {moved:true,cancelled:false};
 }
-async function animateSnakeStepLive(index,adj,matrix,version,duration){
+async function animateSnakeStepLive(index,adj,matrix,version){
   const piece = dark[index];
   piece.el.classList.add('enemy-moving');
   const moved = moveSnakeOneLive(index,adj,matrix);
   if (!moved){ piece.el.classList.remove('enemy-moving'); return {moved:false,cancelled:false}; }
   renderAll();
-  if (!reduceMotion){ await sleep(duration); if (version !== gameVersion) return {moved:true,cancelled:true}; }
+  if (!await waitAtEnemyNode(version)) return {moved:true,cancelled:true};
   piece.el.classList.remove('enemy-moving');
   return {moved:true,cancelled:false};
 }
@@ -1210,18 +1211,18 @@ async function foxHopLive(index,version){
   piece.el.classList.add('fox-hopping','enemy-moving');
   renderFoxHopFx(plan,'mid');
   piece.pos = plan.mid; renderAll();
-  if (!reduceMotion){ await sleep(ENEMY_TIMING.foxToMid); if (version !== gameVersion) return finish({cancelled:true}); }
+  if (!await waitAtEnemyNode(version)) return finish({cancelled:true});
   if (plan.overPlayers.length){
     const names = plan.overPlayers.map(playerIndex => playerIndex === 0 ? 'I' : 'II').join(' og ');
     log('En rev springer over brikke ' + names + '. Brikken er trygg; reven stanser etter landingen.');
   }
-  if (!reduceMotion){ await sleep(ENEMY_TIMING.foxMidPause); if (version !== gameVersion) return finish({cancelled:true}); }
+
   renderFoxHopFx(plan,'land');
   piece.pos = plan.land;
   const captured = Engine.captureAt(liveState(),plan.land);
   if (captured.length) logCaptures(captured,'F',true);
   renderAll();
-  if (!reduceMotion){ await sleep(ENEMY_TIMING.foxToLand); if (version !== gameVersion) return finish({cancelled:true}); }
+  if (!await waitAtEnemyNode(version)) return finish({cancelled:true});
   return finish({moved:true,leapt:plan.leapt});
 }
 async function runSymbolEnemy(version){
@@ -1249,7 +1250,7 @@ async function runSymbolEnemy(version){
     if (!choice) break;
     wokenSnakes.add(choice.index);
     for (let step = 0; step < 2; step++){
-      const stepResult = await animateSnakeStepLive(choice.index,snakeAdj,snakeDist,version,ENEMY_TIMING.symbolSnakeStep);
+      const stepResult = await animateSnakeStepLive(choice.index,snakeAdj,snakeDist,version);
       if (stepResult.cancelled) return false;
       if (!stepResult.moved) break;
       if (!players.some(player => player.alive)) break;
@@ -1275,7 +1276,7 @@ async function runTideEnemy(version){
   const snakeIndices = rng.shuffled(dark.map((piece,index) => ({piece,index})).filter(item => item.piece.type === 'S' && !item.piece.bound).map(item => item.index));
   for (const index of snakeIndices){
     if (!players.some(player => player.alive)) break;
-    const stepResult = await animateSnakeStepLive(index,graph.out,graph.dist,version,ENEMY_TIMING.tideSnakeStep);
+    const stepResult = await animateSnakeStepLive(index,graph.out,graph.dist,version);
     if (stepResult.cancelled) return false;
     if (stepResult.moved) crept++;
   }
@@ -1292,7 +1293,7 @@ async function runTideEnemy(version){
   while (total > 0 && players.some(player => player.alive)){
     const choice = Engine.choosePursuer(liveState(),(piece,index) => piece.type === 'F' && !piece.bound && (moved.get(index) || 0) < 4,graph.dist,rng);
     if (!choice) break;
-    const stepResult = await animateDarkStepLive(choice,graph.out,graph.dist,version,ENEMY_TIMING.tideFoxStep);
+    const stepResult = await animateDarkStepLive(choice,graph.out,graph.dist,version);
     if (stepResult.cancelled) return false;
     if (!stepResult.moved){ moved.set(choice.index,99); continue; }
     moved.set(choice.index,(moved.get(choice.index) || 0) + 1); total--;
@@ -1311,7 +1312,7 @@ async function runAggregateEnemy(version){
   while (total > 0 && players.some(player => player.alive)){
     const choice = Engine.choosePursuer(liveState(),(piece,index) => !piece.bound && (moved.get(index) || 0) < 3,graph.dist,rng);
     if (!choice) break;
-    const stepResult = await animateDarkStepLive(choice,graph.out,graph.dist,version,ENEMY_TIMING.aggregateStep);
+    const stepResult = await animateDarkStepLive(choice,graph.out,graph.dist,version);
     if (stepResult.cancelled) return false;
     if (!stepResult.moved){ moved.set(choice.index,99); continue; }
     moved.set(choice.index,(moved.get(choice.index) || 0) + 1); total--;
@@ -1325,8 +1326,7 @@ $('darkBtn').addEventListener('click',async () => {
   renderLegal(); renderAll(); updateHud();
   if (blindNext){
     blindNext = false; eDice = [0,0]; drawDice(); status('Fienden famler i mørket. Ingen rører seg.');
-    if (!reduceMotion) await sleep(ENEMY_TIMING.blindPause);
-    if (version !== gameVersion) return;
+    if (!await waitAtEnemyNode(version)) return;
     endDark(); return;
   }
   let completed = true;
