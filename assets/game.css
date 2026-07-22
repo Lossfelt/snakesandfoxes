@@ -73,6 +73,7 @@ main{width:100%;max-width:650px;padding:5px 12px 46px;display:flex;flex-directio
 #boardwrap.fx-ild::after{background:radial-gradient(circle at 50% 70%,rgba(255,126,46,.75),rgba(191,35,16,.2) 42%,transparent 72%);animation:powerBloom .78s ease-out}
 #boardwrap.fx-mus::after{background:radial-gradient(circle at 30% 30%,rgba(140,188,197,.5),transparent 33%),radial-gradient(circle at 72% 68%,rgba(190,132,211,.45),transparent 40%);animation:powerBloom .92s ease-out}
 #boardwrap.fx-jern::after{background:radial-gradient(circle at 50% 50%,rgba(221,230,226,.48),rgba(90,101,100,.14) 37%,transparent 70%);animation:powerBloom .72s ease-out}
+#boardwrap.fx-vev::after{background:conic-gradient(from 40deg at 50% 50%,transparent,rgba(90,222,193,.42),transparent 34%,rgba(119,174,231,.34),transparent 69%);animation:powerBloom .86s ease-out}
 #boardwrap>svg{display:block;width:100%;height:auto;user-select:none;touch-action:manipulation}
 
 /* board pieces and interaction */
@@ -104,7 +105,10 @@ main{width:100%;max-width:650px;padding:5px 12px 46px;display:flex;flex-directio
 .dark-piece{outline:none}
 .dark-piece.bind-target{cursor:pointer;transition:none;filter:url(#pieceShadow) drop-shadow(0 0 9px rgba(239,190,84,.96));animation:bindTarget 1.05s ease-in-out infinite}
 .dark-piece.bind-target:focus{filter:url(#pieceShadow) drop-shadow(0 0 13px rgba(255,232,164,1))}
-.fox-hopping{transition:transform 500ms cubic-bezier(.16,.76,.18,1),filter .2s ease,opacity .18s ease;filter:url(#pieceShadow) drop-shadow(0 -9px 7px rgba(255,231,172,.82))}
+.fox-hopping{transition:filter .2s ease,opacity .18s ease;filter:url(#pieceShadow) drop-shadow(0 -9px 7px rgba(255,231,172,.82))}
+.weave-edge-hit{fill:transparent;stroke:transparent;stroke-width:2;pointer-events:none;outline:none}
+#boardwrap.weave-mode .weave-edge-hit{pointer-events:all;cursor:pointer;fill:rgba(104,231,205,.13);stroke:rgba(150,245,226,.72);stroke-width:2.5;filter:url(#softGlow);animation:bindTarget 1.05s ease-in-out infinite}
+#boardwrap.weave-mode .weave-edge-hit:focus{fill:rgba(151,246,227,.24);stroke:#d4fff5;stroke-width:4}
 .fox-over-marker{fill:rgba(131,193,214,.12);stroke:#8ec7da;stroke-width:3;stroke-dasharray:6 4;filter:url(#softGlow)}
 .fox-over-core{fill:none;stroke:rgba(221,243,250,.9);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round;filter:url(#softGlow)}
 .fox-land-marker{fill:rgba(239,190,84,.12);stroke:#efbe54;stroke-width:3.8;filter:url(#softGlow);animation:legalPulse 1s ease-in-out infinite}
@@ -195,9 +199,9 @@ button.big:disabled{color:rgba(228,215,186,.42);text-shadow:none;background:line
 #cheatlabel{display:flex;align-items:center;gap:9px;font-family:ui-monospace,monospace;font-size:.59rem;letter-spacing:.23em;text-transform:uppercase;color:var(--parchment-faint);text-align:center}
 #cheatlabel::before,#cheatlabel::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,transparent,rgba(224,168,91,.3))}
 #cheatlabel::after{transform:scaleX(-1)}
-#cheats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+#cheats{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
 .cheat{--power:#d4a259;position:relative;min-height:90px;padding:9px 7px 8px;border:1px solid color-mix(in srgb,var(--power) 72%,#5b371d);background:linear-gradient(180deg,color-mix(in srgb,var(--power) 10%,transparent),rgba(0,0,0,.12) 44%,rgba(0,0,0,.25));color:var(--parchment);border-radius:8px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:flex-start;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 2px 5px rgba(0,0,0,.24);transition:transform .14s ease,background .2s ease,box-shadow .2s ease,opacity .2s ease}
-#chMot{--power:#e2b95e}#chIld{--power:#dc6a3d}#chMus{--power:#8faec6}#chJern{--power:#aab0a9}
+#chMot{--power:#e2b95e}#chIld{--power:#dc6a3d}#chMus{--power:#8faec6}#chJern{--power:#aab0a9}#chVev{--power:#79d8c4}
 .cheat::after{content:"";position:absolute;inset:4px;border-radius:5px;border:1px solid color-mix(in srgb,var(--power) 22%,transparent);pointer-events:none}
 .cheat:hover:not(:disabled){transform:translateY(-2px);background:linear-gradient(180deg,color-mix(in srgb,var(--power) 20%,transparent),rgba(0,0,0,.13) 48%,rgba(0,0,0,.22));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 5px 10px rgba(0,0,0,.34)}
 .cheat-icon{display:grid;place-items:center;width:30px;height:30px;margin-bottom:1px;color:var(--power);filter:drop-shadow(0 2px 1px rgba(0,0,0,.7))}

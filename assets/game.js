@@ -43,7 +43,7 @@ const BALANCE_STATS = {
   kutt: {games:500,wins:178,rate:0.356,low:0.3152745600,high:0.3989212500,avgRounds:5.484,oneSurvivorWins:153},
   villvev: {games:500,wins:26,rate:0.052,low:0.0357302651,high:0.0751011439,avgRounds:29.686,oneSurvivorWins:24}
 };
-const POWER_STATS = 'Bonusmåling for kreftene er ikke kjørt på nytt etter de siste endringene i slangebevegelse og v5-regler. Tallene i tabellen over er derimot oppdatert med en ny simulering (n=500 per modus).';
+const POWER_STATS = 'Bonusmåling for kreftene er ikke kjørt på nytt etter de siste endringene i slangebevegelse og v5-regler, og Vev er foreløpig ikke med i kraftmatrisen. Tallene i tabellen over er derimot oppdatert med en ny simulering (n=500 per modus).';
 
 let mode = 'symbol';
 const rulesFor = (name = mode) => RULESETS[name];
@@ -244,9 +244,22 @@ function createWildGraph(seed){
   throw new Error('Klarte ikke å lage en spillbar villvev for frø ' + seed + '.');
 }
 const GRAPHS = {full:createGraph(false), cut:createGraph(true)};
-function graphForMode(modeName,seed){
+function cloneStaticGraph(source,seed){
+  return finalizeGraph({
+    key:source.key + ':game:' + seed,
+    topology:source.topology,
+    cut:source.cut,
+    out:source.out.map(next => next.slice()),
+    outSC:source.outSC.map(next => next.slice()),
+    dirEdges:source.dirEdges.map(edge => edge.slice()),
+    randomized:source.randomized
+  },source.topology === 'full');
+}
+function graphForMode(modeName,seed,isolated = false){
   const rule = rulesFor(modeName);
-  return rule.topology === 'wild' ? createWildGraph(seed) : GRAPHS[rule.topology];
+  if (rule.topology === 'wild') return createWildGraph(seed);
+  const source = GRAPHS[rule.topology];
+  return isolated ? cloneStaticGraph(source,seed) : source;
 }
 let graph = GRAPHS.full;
 
@@ -491,6 +504,7 @@ const haloG = el('g',{stroke:'rgba(255,208,137,.18)','stroke-linecap':'round',fi
 const webG = el('g',{stroke:'#170d08','stroke-width':3.1,'stroke-linecap':'round',fill:'none','aria-hidden':'true'},svg);
 const chevShadowG = el('g',{fill:'none',stroke:'rgba(35,8,4,.72)','stroke-linecap':'round','stroke-linejoin':'round',filter:'url(#webShadow)','aria-hidden':'true'},svg);
 const chevG = el('g',{fill:'none',stroke:'#170d08','stroke-width':3.15,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'},svg);
+const weaveTargetG = el('g',{class:'weave-targets'},svg);
 const arrowVisuals = [];
 function line(a,b,width){
   const w = width || 3.1;
@@ -499,7 +513,7 @@ function line(a,b,width){
   el('line',{x1:XY[a][0],y1:XY[a][1],x2:XY[b][0],y2:XY[b][1],'stroke-width':w},webG);
 }
 function drawWeb(currentGraph){
-  webShadowG.innerHTML = ''; haloG.innerHTML = ''; webG.innerHTML = ''; chevShadowG.innerHTML = ''; chevG.innerHTML = '';
+  webShadowG.innerHTML = ''; haloG.innerHTML = ''; webG.innerHTML = ''; chevShadowG.innerHTML = ''; chevG.innerHTML = ''; weaveTargetG.innerHTML = '';
   arrowVisuals.length = 0;
   for (let s = 0; s < S; s++) line(CENTER, id['1,' + s]);
   for (let r = 1; r < R; r++) for (let s = 0; s < S; s++){
@@ -530,7 +544,13 @@ function drawWeb(currentGraph){
     el('path',{d:'M-6 -5.8 L5.8 0 L-6 5.8','stroke-width':8.4,stroke:'rgba(35,8,4,.72)',transform},chevShadowG);
     const glowPath = el('path',{d:'M-6 -5.8 L5.8 0 L-6 5.8','stroke-width':5.8,stroke:glow,transform,class:'route-arrow-glow'},haloG);
     const arrowPath = el('path',{d:'M-6 -5.8 L5.8 0 L-6 5.8',stroke:main,transform,class:'route-arrow','data-from':a,'data-to':b,'data-route-state':'base'},chevG);
-    arrowVisuals.push({from:a,to:b,kind,path:arrowPath,glowPath,baseMain:main,baseGlow:glow});
+    const hit = el('circle',{cx:mx,cy:my,r:17,class:'weave-edge-hit',tabindex:'-1',role:'button','aria-disabled':'true','aria-label':'Snu pil fra ' + nodeName(a) + ' til ' + nodeName(b)},weaveTargetG);
+    hit.addEventListener('pointerdown',event => { if (!weaveMode) return; event.preventDefault(); event.stopPropagation(); reverseWeaveEdge(a,b); });
+    hit.addEventListener('keydown',event => {
+      if (!weaveMode || (event.key !== 'Enter' && event.key !== ' ')) return;
+      event.preventDefault(); reverseWeaveEdge(a,b);
+    });
+    arrowVisuals.push({from:a,to:b,kind,path:arrowPath,glowPath,hit,baseMain:main,baseGlow:glow});
   }
 }
 drawWeb(graph);
@@ -637,16 +657,17 @@ function mkPlayerEl(number){
 /* ================= live state ================= */
 let dark = [], players = [], phase = 'ritual', turnNo = 0, activeDisc = -1;
 let pDice = [0,0], eDice = [0,0], cheats = {}, dazzle = 0, blindNext = false;
-let motArmed = false, bindMode = false, bindReturnStatus = '', breaches = 0, anyStep = false;
+let motArmed = false, bindMode = false, bindReturnStatus = '', weaveMode = false, weaveReturnStatus = '', breaches = 0, anyStep = false;
 let gameVersion = 0, undoStack = [], gameSeed = 0, rng = new SeededRng(1);
 let renderedGraphKey = graph.key;
 const liveState = () => ({players,dark});
 function livingDiscs(){ return players.filter(player => player.alive && !player.done); }
+function targetModeActive(){ return bindMode || weaveMode; }
 function applyModeGraph(){
   const rule = rulesFor();
   const next = rule.topology === 'wild' && graph.topology === 'wild' && graph.seed === gameSeed
     ? graph
-    : graphForMode(mode,gameSeed);
+    : graphForMode(mode,gameSeed,true);
   graph = next;
   if (renderedGraphKey !== next.key){ drawWeb(next); renderedGraphKey = next.key; }
 }
@@ -665,8 +686,8 @@ function reset(){
   }
   players = [0,1].map(number => ({pos:CENTER,alive:true,touched:false,done:false,steps:0,touchSpoke:-1,el:mkPlayerEl(number)}));
   phase = 'ritual'; turnNo = 0; activeDisc = -1; pDice = [0,0]; eDice = [0,0];
-  cheats = {mot:false,ild:false,mus:false,jern:false};
-  dazzle = 0; blindNext = false; motArmed = false; bindMode = false; bindReturnStatus = '';
+  cheats = {mot:false,ild:false,mus:false,jern:false,vev:false};
+  dazzle = 0; blindNext = false; motArmed = false; bindMode = false; bindReturnStatus = ''; weaveMode = false; weaveReturnStatus = '';
   breaches = 0; anyStep = false;
   document.getElementById('log').innerHTML = '';
   rovingNode = CENTER;
@@ -675,7 +696,7 @@ function reset(){
 }
 function stackOffset(index, position){
   const peers = [];
-  dark.forEach((piece,pieceIndex) => { if (piece.pos === position) peers.push(pieceIndex); });
+  dark.forEach((piece,pieceIndex) => { if (pieceIndex === index || piece.pos === position) peers.push(pieceIndex); });
   const stackIndex = peers.indexOf(index);
   if (bindMode && peers.length > 1){
     const radius = 34;
@@ -685,6 +706,11 @@ function stackOffset(index, position){
   const angle = stackIndex * 2.4;
   return [Math.cos(angle) * stackIndex * 4.5, Math.sin(angle) * stackIndex * 4.5];
 }
+function darkPiecePoint(index,position,lift = 0){
+  const [ox,oy] = stackOffset(index,position);
+  return [XY[position][0] + ox,XY[position][1] + oy - lift];
+}
+function pointTransform(point){ return 'translate(' + point[0] + 'px,' + point[1] + 'px)'; }
 function renderSectorGuides(){
   sectorG.innerHTML = '';
   if (rulesFor().returnRule !== 'sector') return;
@@ -705,7 +731,7 @@ function renderSectorGuides(){
   });
 }
 function renderBindTargets(){
-  tapG.style.pointerEvents = bindMode ? 'none' : 'all';
+  tapG.style.pointerEvents = targetModeActive() ? 'none' : 'all';
   dark.forEach((piece,index) => {
     const targetable = bindMode && !piece.bound;
     piece.el.classList.toggle('bind-target', targetable);
@@ -713,6 +739,23 @@ function renderBindTargets(){
     piece.el.setAttribute('aria-disabled', targetable ? 'false' : 'true');
     const typeName = piece.type === 'S' ? 'slange' : 'rev';
     piece.el.setAttribute('aria-label', targetable ? 'Bind ' + typeName + ' med jern' : (piece.bound ? 'Bundet ' + typeName : typeName));
+  });
+}
+function renderWeaveTargets(){
+  const board = $('boardwrap');
+  board.classList.toggle('weave-mode',weaveMode);
+  arrowVisuals.forEach(visual => {
+    visual.hit.setAttribute('tabindex',weaveMode ? '0' : '-1');
+    visual.hit.setAttribute('aria-disabled',weaveMode ? 'false' : 'true');
+    visual.path.classList.toggle('weave-target',weaveMode);
+    if (weaveMode){
+      visual.path.style.stroke = '#8ff0dc';
+      visual.path.style.strokeWidth = '4.6';
+      visual.path.style.opacity = '1';
+      visual.glowPath.style.stroke = 'rgba(116,245,219,.62)';
+      visual.glowPath.style.strokeWidth = '8';
+      visual.glowPath.style.opacity = '1';
+    }
   });
 }
 function clearFoxHopFx(){ hopFxG.innerHTML = ''; }
@@ -804,7 +847,7 @@ function distancesToTargets(targets,adjacency){
   return distance;
 }
 function updateArrowGuidance(){
-  const usable = phase === 'move' && !bindMode && activeDisc >= 0;
+  const usable = phase === 'move' && !targetModeActive() && activeDisc >= 0;
   const player = usable ? players[activeDisc] : null;
   if (!player || !player.alive || player.done || player.steps <= 0){
     resetArrowGuidance();
@@ -849,7 +892,7 @@ function updateArrowGuidance(){
 function renderAll(){
   dark.forEach((piece,index) => {
     const [ox,oy] = stackOffset(index,piece.pos);
-    piece.el.style.transform = 'translate(' + (XY[piece.pos][0]+ox) + 'px,' + (XY[piece.pos][1]+oy) + 'px)';
+    piece.el.style.transform = pointTransform([XY[piece.pos][0] + ox,XY[piece.pos][1] + oy]);
     piece.el.classList.toggle('bound',piece.bound);
   });
   players.forEach((player,index) => {
@@ -863,12 +906,13 @@ function renderAll(){
   renderSectorGuides();
   renderBindTargets();
   updateArrowGuidance();
+  renderWeaveTargets();
   updateNodeAccessibility();
 }
 function legalMovesFor(index){ return Engine.legalMoves(liveState(),index,rulesFor(),graph); }
 function renderLegal(){
   legalG.innerHTML = '';
-  if (bindMode || phase !== 'move' || activeDisc < 0) { updateNodeAccessibility(); return; }
+  if (targetModeActive() || phase !== 'move' || activeDisc < 0) { updateNodeAccessibility(); return; }
   const player = players[activeDisc];
   if (player && player.alive && !player.done){
     el('circle',{cx:XY[player.pos][0],cy:XY[player.pos][1],r:22,class:'active-node-ring'},legalG);
@@ -889,7 +933,7 @@ function nodeName(index){
 }
 function updateNodeAccessibility(){
   if (!tapNodes.length || !players.length) return;
-  const legal = new Set(phase === 'move' && !bindMode && activeDisc >= 0 ? legalMovesFor(activeDisc) : []);
+  const legal = new Set(phase === 'move' && !targetModeActive() && activeDisc >= 0 ? legalMovesFor(activeDisc) : []);
   tapNodes.forEach((circle,index) => {
     const parts = [nodeName(index)];
     const herePlayers = [];
@@ -910,7 +954,7 @@ function updateNodeAccessibility(){
     const selectable = legal.has(index) || herePlayers.length > 0;
     circle.setAttribute('aria-label',parts.join(', '));
     circle.setAttribute('aria-disabled',selectable ? 'false' : 'true');
-    circle.setAttribute('tabindex',!bindMode && index === rovingNode ? '0' : '-1');
+    circle.setAttribute('tabindex',!targetModeActive() && index === rovingNode ? '0' : '-1');
   });
 }
 
@@ -991,26 +1035,30 @@ function updateJourney(){
   });
 }
 function updateHud(){
-  $('rollBtn').disabled = phase !== 'roll' || bindMode;
-  $('darkBtn').disabled = phase !== 'move' || bindMode;
-  $('swapBtn').disabled = !(phase === 'move' && !bindMode && !anyStep && livingDiscs().length === 2);
-  $('undoBtn').disabled = !(phase === 'move' && !bindMode && undoStack.length);
-  $('pickBtn').disabled = phase === 'dark' || bindMode;
+  const lockedByTarget = targetModeActive();
+  $('rollBtn').disabled = phase !== 'roll' || lockedByTarget;
+  $('darkBtn').disabled = phase !== 'move' || lockedByTarget;
+  $('swapBtn').disabled = !(phase === 'move' && !lockedByTarget && !anyStep && livingDiscs().length === 2);
+  $('undoBtn').disabled = !(phase === 'move' && !lockedByTarget && undoStack.length);
+  $('pickBtn').disabled = phase === 'dark' || lockedByTarget;
   const remaining = players.reduce((sum,player) => sum + (player.alive && !player.done ? Math.max(0,player.steps || 0) : 0),0);
   $('darkBtn').textContent = phase === 'move' && remaining > 0 ? 'Avslutt tur (' + remaining + ' steg ubrukt)' : 'Avslutt tur: fienden flytter';
-  const lockedByBind = bindMode;
-  $('chMot').disabled = lockedByBind || cheats.mot || phase === 'ritual' || phase === 'over' || phase === 'dark' || phase === 'move';
-  $('chIld').disabled = lockedByBind || cheats.ild || !(phase === 'roll' || phase === 'move');
-  $('chMus').disabled = lockedByBind || cheats.mus || !(phase === 'roll' || phase === 'move');
-  $('chJern').disabled = cheats.jern || (!bindMode && !(phase === 'roll' || phase === 'move'));
+  $('chMot').disabled = lockedByTarget || cheats.mot || phase === 'ritual' || phase === 'over' || phase === 'dark' || phase === 'move';
+  $('chIld').disabled = lockedByTarget || cheats.ild || !(phase === 'roll' || phase === 'move');
+  $('chMus').disabled = lockedByTarget || cheats.mus || !(phase === 'roll' || phase === 'move');
+  $('chJern').disabled = cheats.jern || weaveMode || (!bindMode && !(phase === 'roll' || phase === 'move'));
+  $('chVev').disabled = cheats.vev || bindMode || (!weaveMode && !(phase === 'roll' || phase === 'move'));
   $('chMot').classList.toggle('armed',motArmed);
   $('chJern').classList.toggle('armed',bindMode);
   $('chJern').setAttribute('aria-pressed',bindMode ? 'true' : 'false');
   $('chJern').querySelector('b').textContent = bindMode ? 'Avbryt jern' : 'Jern';
   $('chJern').querySelector('.cheat-copy').textContent = bindMode ? 'trykk igjen eller Esc for å avbryte' : 'til å binde: lås én brikke for godt';
-  updateJourney(); drawDice(); renderBindTargets(); updateNodeAccessibility();
+  $('chVev').classList.toggle('armed',weaveMode);
+  $('chVev').setAttribute('aria-pressed',weaveMode ? 'true' : 'false');
+  $('chVev').querySelector('b').textContent = weaveMode ? 'Avbryt vev' : 'Vev';
+  $('chVev').querySelector('.cheat-copy').textContent = weaveMode ? 'velg en pil, eller trykk igjen eller Esc' : 'til å vende: snu én enveispil';
+  updateJourney(); drawDice(); renderBindTargets(); renderWeaveTargets(); updateNodeAccessibility();
 }
-
 /* ================= player turn ================= */
 function beginPlayerTurn(){
   turnNo++;
@@ -1033,16 +1081,16 @@ function beginPlayerTurn(){
   log('Du kaster ' + pDice[0] + ' og ' + pDice[1] + '.');
   renderAll(); renderLegal(); updateHud();
 }
-$('rollBtn').addEventListener('click',() => { if (phase === 'roll') beginPlayerTurn(); });
+$('rollBtn').addEventListener('click',() => { if (phase === 'roll' && !targetModeActive()) beginPlayerTurn(); });
 $('undoBtn').addEventListener('click',() => {
-  if (phase !== 'move' || bindMode || !undoStack.length) return;
+  if (phase !== 'move' || targetModeActive() || !undoStack.length) return;
   const snapshot = undoStack.pop();
   players.forEach((player,index) => Object.assign(player,snapshot.players[index]));
   activeDisc = snapshot.activeDisc; anyStep = snapshot.anyStep; rovingNode = snapshot.rovingNode;
   log('Angret ett steg.'); renderAll(); renderLegal(); updateHud();
 });
 $('swapBtn').addEventListener('click',() => {
-  if (phase !== 'move' || bindMode || anyStep) return;
+  if (phase !== 'move' || targetModeActive() || anyStep) return;
   const living = livingDiscs();
   if (living.length === 2) [living[0].steps,living[1].steps] = [living[1].steps,living[0].steps];
   renderLegal(); updateHud();
@@ -1072,7 +1120,7 @@ function applyPlayerStep(index,node){
   renderAll(); renderLegal(); updateHud();
 }
 function tapNode(node){
-  if (bindMode) return;
+  if (targetModeActive()) return;
   if (phase !== 'move') return;
   if (activeDisc >= 0 && legalMovesFor(activeDisc).includes(node)){
     applyPlayerStep(activeDisc,node);
@@ -1086,7 +1134,7 @@ function tapNode(node){
 }
 function selectDisc(index){
   const player = players[index];
-  if (phase !== 'move' || !player || !player.alive || player.done) return;
+  if (phase !== 'move' || targetModeActive() || !player || !player.alive || player.done) return;
   activeDisc = index; rovingNode = player.pos;
   if (rulesFor().returnRule === 'sector' && player.touched){
     status('Brikke <b>' + (index === 0 ? 'I' : 'II') + '</b> valgt. Inngangssektoren er ringet inn; gyldige hjem-eiker lyser ved sentrum.');
@@ -1097,7 +1145,7 @@ function selectDisc(index){
 /* ================= rule-breaking powers ================= */
 function breach(message){ breaches++; log(message + ' <b>(regelbrudd)</b>'); }
 function flashPower(kind){
-  const board = $('boardwrap'), classes = ['fx-mot','fx-ild','fx-mus','fx-jern'];
+  const board = $('boardwrap'), classes = ['fx-mot','fx-ild','fx-mus','fx-jern','fx-vev'];
   board.classList.remove(...classes);
   void board.offsetWidth;
   const className = 'fx-' + kind;
@@ -1105,7 +1153,7 @@ function flashPower(kind){
   window.setTimeout(() => board.classList.remove(className),950);
 }
 function beginBindMode(){
-  if (cheats.jern || !(phase === 'roll' || phase === 'move')) return;
+  if (cheats.jern || targetModeActive() || !(phase === 'roll' || phase === 'move')) return;
   bindMode = true; bindReturnStatus = $('status').innerHTML;
   status('JERN: Velg den markerte slangen eller reven som skal bindes. Hver stablet brikke kan velges direkte. Trykk Jern igjen eller Esc for å avbryte.');
   renderLegal(); renderAll(); updateHud();
@@ -1135,23 +1183,68 @@ function bindDark(index){
   if (phase === 'move' && activeDisc >= 0) setRovingNode(players[activeDisc].pos,true);
   else $('rollBtn').focus();
 }
+function reverseAdjacencyEdge(adjacency,from,to){
+  const index = adjacency[from].indexOf(to);
+  if (index < 0) return false;
+  adjacency[from].splice(index,1);
+  if (!adjacency[to].includes(from)) adjacency[to].push(from);
+  return true;
+}
+function beginWeaveMode(){
+  if (cheats.vev || targetModeActive() || !(phase === 'roll' || phase === 'move')) return;
+  weaveMode = true; weaveReturnStatus = $('status').innerHTML;
+  status('VEV: Velg en markert enveispil. Retningen snus for resten av spillet. Trykk Vev igjen eller Esc for å avbryte.');
+  renderLegal(); renderAll(); updateHud();
+  requestAnimationFrame(() => {
+    const first = arrowVisuals.find(visual => visual.hit);
+    if (first) first.hit.focus();
+  });
+}
+function cancelWeaveMode(announce = true){
+  if (!weaveMode) return;
+  weaveMode = false;
+  if (announce) status(weaveReturnStatus || 'Vev ble ikke brukt.');
+  renderAll(); renderLegal(); updateHud();
+  if (phase === 'move' && activeDisc >= 0) setRovingNode(players[activeDisc].pos,true);
+  else $('chVev').focus();
+}
+function reverseWeaveEdge(from,to){
+  if (!weaveMode) return;
+  const edgeIndex = graph.dirEdges.findIndex(edge => edge[0] === from && edge[1] === to);
+  if (edgeIndex < 0 || !reverseAdjacencyEdge(graph.out,from,to)) return;
+  if (!reverseAdjacencyEdge(graph.outSC,to,from)) reverseAdjacencyEdge(graph.outSC,from,to);
+  const kind = graph.dirEdges[edgeIndex][2];
+  graph.dirEdges[edgeIndex] = [to,from,kind];
+  graph.key += ':vev:' + from + ':' + to;
+  finalizeGraph(graph,graph.topology === 'full');
+  weaveMode = false; cheats.vev = true;
+  drawWeb(graph); renderedGraphKey = graph.key;
+  breach('VEV vender enveispilen fra ' + nodeName(from) + ' til ' + nodeName(to) + '.');
+  status('Vev snur pilen. Den peker nå fra <b>' + nodeName(to) + '</b> til <b>' + nodeName(from) + '</b>.');
+  flashPower('vev');
+  renderAll(); renderLegal(); updateHud();
+  if (phase === 'move' && activeDisc >= 0) setRovingNode(players[activeDisc].pos,true);
+  else $('rollBtn').focus();
+}
 $('chMot').addEventListener('click',() => {
-  if (cheats.mot || bindMode) return;
+  if (cheats.mot || targetModeActive()) return;
   cheats.mot = true; motArmed = true; breach('MOT er påkalt. Neste kast dobles.'); flashPower('mot'); updateHud();
 });
 $('chIld').addEventListener('click',() => {
-  if (cheats.ild || bindMode) return;
+  if (cheats.ild || targetModeActive()) return;
   cheats.ild = true; blindNext = true; breach('ILD blinder fienden. Neste fiendefase står de stille.'); flashPower('ild'); updateHud();
 });
 $('chMus').addEventListener('click',() => {
-  if (cheats.mus || bindMode) return;
+  if (cheats.mus || targetModeActive()) return;
   cheats.mus = true; dazzle = 2; breach('MUSIKK blender fienden i to fiendefaser.'); flashPower('mus'); updateHud();
 });
 $('chJern').addEventListener('click',() => { if (bindMode) cancelBindMode(); else beginBindMode(); });
+$('chVev').addEventListener('click',() => { if (weaveMode) cancelWeaveMode(); else beginWeaveMode(); });
 document.addEventListener('keydown',event => {
-  if (event.key === 'Escape' && bindMode && !$('overlay').open){ event.preventDefault(); cancelBindMode(); }
+  if (event.key !== 'Escape' || $('overlay').open) return;
+  if (bindMode){ event.preventDefault(); cancelBindMode(); }
+  else if (weaveMode){ event.preventDefault(); cancelWeaveMode(); }
 });
-
 /* ================= enemy phase ================= */
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve,milliseconds));
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1162,6 +1255,36 @@ const ENEMY_TIMING = Object.freeze({
 async function waitAtEnemyNode(version){
   if (reduceMotion) return version === gameVersion;
   await sleep(ENEMY_TIMING.transition);
+  if (version !== gameVersion) return false;
+  await sleep(ENEMY_TIMING.nodePause);
+  return version === gameVersion;
+}
+function quadraticPoint(from,control,to,t){
+  const rest = 1 - t;
+  return [
+    rest * rest * from[0] + 2 * rest * t * control[0] + t * t * to[0],
+    rest * rest * from[1] + 2 * rest * t * control[1] + t * t * to[1]
+  ];
+}
+function foxArcKeyframes(from,to){
+  const distance = Math.hypot(to[0] - from[0],to[1] - from[1]);
+  const arcHeight = Math.min(30,14 + distance * .06);
+  const control = [(from[0] + to[0]) / 2,(from[1] + to[1]) / 2 - arcHeight];
+  return [0,.25,.5,.75,1].map(offset => ({
+    offset,
+    transform:pointTransform(quadraticPoint(from,control,to,offset))
+  }));
+}
+async function animateFoxArcSegment(index,from,to,version){
+  const piece = dark[index];
+  piece.el.style.transform = pointTransform(to);
+  if (reduceMotion || typeof piece.el.animate !== 'function') return version === gameVersion;
+  const animation = piece.el.animate(foxArcKeyframes(from,to),{
+    duration:ENEMY_TIMING.transition,
+    easing:'linear'
+  });
+  try { await animation.finished; }
+  catch { return false; }
   if (version !== gameVersion) return false;
   await sleep(ENEMY_TIMING.nodePause);
   return version === gameVersion;
@@ -1207,11 +1330,14 @@ async function foxHopLive(index,version){
   const plan = Engine.planFoxHop(liveState(),index,graph,rng);
   if (!plan) return {moved:false,leapt:false};
   const piece = dark[index];
-  const finish = result => { clearFoxHopFx(); piece.el.classList.remove('fox-hopping','enemy-moving'); return result; };
+  const startPoint = darkPiecePoint(index,piece.pos);
+  const midPoint = darkPiecePoint(index,plan.mid,14);
+  const landPoint = darkPiecePoint(index,plan.land);
+  const finish = result => { clearFoxHopFx(); piece.el.classList.remove('fox-hopping','enemy-moving'); renderAll(); return result; };
   piece.el.classList.add('fox-hopping','enemy-moving');
   renderFoxHopFx(plan,'mid');
   piece.pos = plan.mid; renderAll();
-  if (!await waitAtEnemyNode(version)) return finish({cancelled:true});
+  if (!await animateFoxArcSegment(index,startPoint,midPoint,version)) return finish({cancelled:true});
   if (plan.overPlayers.length){
     const names = plan.overPlayers.map(playerIndex => playerIndex === 0 ? 'I' : 'II').join(' og ');
     log('En rev springer over brikke ' + names + '. Brikken er trygg; reven stanser etter landingen.');
@@ -1222,7 +1348,7 @@ async function foxHopLive(index,version){
   const captured = Engine.captureAt(liveState(),plan.land);
   if (captured.length) logCaptures(captured,'F',true);
   renderAll();
-  if (!await waitAtEnemyNode(version)) return finish({cancelled:true});
+  if (!await animateFoxArcSegment(index,midPoint,landPoint,version)) return finish({cancelled:true});
   return finish({moved:true,leapt:plan.leapt});
 }
 async function runSymbolEnemy(version){
@@ -1320,7 +1446,7 @@ async function runAggregateEnemy(version){
   return version === gameVersion;
 }
 $('darkBtn').addEventListener('click',async () => {
-  if (phase !== 'move' || bindMode) return;
+  if (phase !== 'move' || targetModeActive()) return;
   const version = gameVersion;
   undoStack = []; phase = 'dark'; activeDisc = -1;
   renderLegal(); renderAll(); updateHud();
@@ -1426,7 +1552,7 @@ function wireStart(scope){
   if (!start) return;
   start.addEventListener('click',() => {
     closeOverlay(); reset();
-    log('Tegnet er tegnet. «Mot til å styrke, ild til å blinde, musikk til å blende, jern til å binde.»');
+    log('Tegnet er tegnet. «Mot til å styrke, ild til å blinde, musikk til å blende, jern til å binde, vev til å vende.»');
     startPlay();
   });
 }
@@ -1731,7 +1857,7 @@ function runPowerMatrix(options = {}){
 window.gameDiagnostics = {
   RULESETS,GRAPHS,Engine,createWildGraph,runSimGame,runBalance,runPowerMatrix,
   currentSeed:() => gameSeed,
-  liveState:() => ({mode,phase,activeDisc,players:players.map(p => ({...p,el:undefined})),dark:dark.map(d => ({...d,el:undefined})),bindMode}),
+  liveState:() => ({mode,phase,activeDisc,players:players.map(p => ({...p,el:undefined})),dark:dark.map(d => ({...d,el:undefined})),bindMode,weaveMode,dirEdges:graph.dirEdges.map(edge => edge.slice())}),
   legalMovesFor,
   setScenario(scenario){
     if (scenario.mode){ mode = scenario.mode; applyModeGraph(); }
