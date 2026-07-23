@@ -167,16 +167,22 @@ body[data-mode="villvev"] #modebar::before{content:"↝"}
 .journey-card[data-stage="lost"] .journey-status{color:#d98b82}
 #dicerow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;font-family:ui-monospace,'Cascadia Mono',Menlo,Consolas,monospace;font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--parchment-dim)}
 .dicegrp{display:flex;align-items:center;align-content:center;gap:6px;min-height:49px;padding:7px 8px;border-radius:8px;background:linear-gradient(180deg,rgba(0,0,0,.22),rgba(0,0,0,.34));border:1px solid rgba(224,168,91,.18);box-shadow:inset 0 1px 6px rgba(0,0,0,.4)}
-.die{width:32px;height:32px;border-radius:7px;position:relative;background:
-  radial-gradient(circle at 30% 20%,rgba(255,255,255,.55),transparent 24%),
-  linear-gradient(145deg,var(--wood-light),var(--wood) 55%,var(--wood-shadow));
-  border:1px solid #8d6636;box-shadow:inset 0 -3px 2px rgba(104,66,25,.32),inset 0 1px 1px rgba(255,255,255,.55),0 3px 5px rgba(0,0,0,.46);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:4px;gap:1px;animation:dieDrop .22s ease-out both}
-.die::after{content:"";position:absolute;inset:2px;border-radius:5px;border:1px solid rgba(255,255,255,.2);pointer-events:none}
-.die.enemy{background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.08),transparent 25%),linear-gradient(145deg,#574333,#2e2219 58%,#18110c);border-color:#17100b;box-shadow:inset 0 -3px 2px rgba(0,0,0,.45),inset 0 1px 1px rgba(255,255,255,.08),0 3px 5px rgba(0,0,0,.48)}
-.die .pip{border-radius:50%;background:var(--ink);align-self:center;justify-self:center;width:5.4px;height:5.4px;box-shadow:inset 0 1px 1px rgba(255,255,255,.18)}
-.die.enemy .pip{background:var(--wood);box-shadow:0 0 1px var(--wood-light)}
+.die{width:32px;height:32px;border:0;border-radius:7px;position:relative;background:transparent center/100% 100% no-repeat url("die-player.png");box-shadow:0 3px 5px rgba(0,0,0,.5);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:5px;gap:1px;animation:dieDrop .22s ease-out both}
+.die::after{content:"";position:absolute;inset:2px;border-radius:6px;box-shadow:inset 0 1px 1px rgba(255,245,218,.18),inset 0 -1px 1px rgba(25,10,3,.2);pointer-events:none}
+.die.enemy{background-image:url("die-enemy.png");box-shadow:0 3px 5px rgba(0,0,0,.58)}
+.die.player-face-1{background-image:url("die-player-1.png")}
+.die.player-face-2{background-image:url("die-player-2.png")}
+.die.player-face-3{background-image:url("die-player-3.png")}
+.die.player-face-4{background-image:url("die-player-4.png")}
+.die.player-face-5{background-image:url("die-player-5.png")}
+.die.player-face-6{background-image:url("die-player-6.png")}
+.die.enemy-snake{background-image:url("die-enemy-snake.png")}
+.die.enemy-fox{background-image:url("die-enemy-fox.png")}
+.die .pip{border-radius:50%;background:#21140c;align-self:center;justify-self:center;width:5px;height:5px;box-shadow:inset 0 1px 1px rgba(255,255,255,.14),0 0 0 1px rgba(77,42,20,.25)}
+.die.enemy .pip{background:#d4a05e;box-shadow:inset 0 1px 1px rgba(255,235,192,.38),0 0 1px #3d1d0c}
 .die.empty{opacity:.25;filter:saturate(.45)}
-.die.num{display:flex;align-items:center;justify-content:center;font:700 15px Georgia,serif;color:var(--ink)}
+.die.empty:not(.enemy){opacity:1;filter:none}
+.die.num{display:flex;align-items:center;justify-content:center;font:700 15px Georgia,serif;color:#24150c;text-shadow:0 1px rgba(255,242,209,.32)}
 .die.sym{width:27px;height:27px;display:flex;align-items:center;justify-content:center;padding:3px}
 #pdice,#edice{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;min-height:32px}
 .die-slot{display:inline-flex;align-items:flex-end;gap:2px}

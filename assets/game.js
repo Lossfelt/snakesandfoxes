@@ -967,6 +967,7 @@ function pipDie(value, enemy, label){
   die.setAttribute('aria-label',label || (value ? value + ' øyne' : 'tom terning'));
   if (typeof value !== 'number' || !isFinite(value) || value < 0) value = 0;
   if (value > 6){ die.classList.add('num'); die.textContent = value; return die; }
+  if (!enemy && value > 0){ die.classList.add('player-face-' + value); return die; }
   const map = {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
   for (let cell = 0; cell < 9; cell++){
     const pip = document.createElement('span');
@@ -978,18 +979,10 @@ function pipDie(value, enemy, label){
 }
 function symDie(symbol,index){
   const die = document.createElement('span');
-  die.className = 'die enemy sym' + (symbol ? '' : ' empty');
+  die.className = 'die enemy sym' + (symbol === 'S' ? ' enemy-snake' : symbol === 'F' ? ' enemy-fox' : '') + (symbol ? '' : ' empty');
   const name = symbol === 'S' ? 'slange' : symbol === 'F' ? 'rev' : symbol === 'B' ? 'blank' : 'tom';
   die.setAttribute('role','img'); die.setAttribute('aria-label','Fiendeterning ' + (index + 1) + ': ' + name);
-  const icon = document.createElementNS(NS,'svg');
-  icon.setAttribute('viewBox','0 0 20 20'); icon.setAttribute('width','16'); icon.setAttribute('height','16'); icon.setAttribute('aria-hidden','true');
-  if (symbol === 'S' || symbol === 'F'){
-    const path = document.createElementNS(NS,'path');
-    path.setAttribute('d',symbol === 'S' ? 'M2 11 Q 6 4, 10 11 T 18 11' : 'M10 3 L17 15 L3 15 Z');
-    path.setAttribute('fill','none'); path.setAttribute('stroke','var(--wood)'); path.setAttribute('stroke-width','2.2');
-    path.setAttribute('stroke-linecap','round'); path.setAttribute('stroke-linejoin','round'); icon.appendChild(path);
-  }
-  die.appendChild(icon); return die;
+  return die;
 }
 function appendPlayerDie(container,player,index,value){
   const slot = document.createElement('span'); slot.className = 'die-slot';
