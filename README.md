@@ -53,7 +53,7 @@ Det brukes ingen eksterne biblioteker, npm-pakker eller backend. Tilfeldighet i 
 └── assets/
     ├── game.js      # Spillmotor, regelsett, simuleringer og interaksjon
     ├── game.css     # Layout, responsiv styling og animasjoner
-    └── sign.svg      # Ikon for spillet
+    └── sign.png      # Ikon for spillet
 ```
 
 ## Bakgrunn

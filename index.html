@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#17100b">
-<link rel="icon" href="assets/sign.svg" type="image/svg+xml">
+<link rel="icon" href="assets/sign.png" type="image/png">
 <title>Slanger og rever</title>
-<link rel="stylesheet" href="assets/game.css">
+<link rel="preload" href="assets/start-screen-panel-v1.webp" as="image" type="image/webp">
+<link rel="stylesheet" href="assets/game.css?v=20260724-1">
 </head>
 <body>
 <header>
@@ -118,12 +119,10 @@
 
 <dialog id="overlay" aria-labelledby="dialogTitle">
   <div class="panel" id="panelcontent">
-    <h2 id="dialogTitle">Snakes & Foxes</h2><p class="ritual-goal">Før brikkene til ytterkanten og hjem igjen før slanger eller rever tar dem.</p>
-    <svg id="signsvg" viewBox="0 0 120 120" role="img" aria-label="En nedovervendt trekant som et reveansikt, krysset av en vertikal bølgelinje som en slange">
-      <path class="tri" d="M14 24 L106 24 L60 106 Z"/>
-      <path class="wave" d="M60 4 Q42 18 60 32 T60 60 T60 88 T60 116"/>
-    </svg>
-    <p class="verse">Courage to strengthen, fire to blind,<br>music to dazzle, iron to bind.</p>
+    <img id="signmark" src="assets/sign.png" width="104" height="104" alt="Reve- og slangesymbolet">
+    <h2 id="dialogTitle">Snakes & Foxes</h2>
+    <p class="ritual-goal">Før brikkene til ytterkanten og hjem igjen før slanger eller rever tar dem.</p>
+    <p class="verse" lang="en">Courage to strengthen, fire to blind,<br>music to dazzle, iron to bind.</p>
     <!-- <p class="verse-en">Courage to strengthen, fire to blind,<br>music to dazzle, iron to bind,<br>weave to reverse.</p> -->
     <div id="modes">
       <button class="modebtn" data-mode="klassisk">v1 Klassisk</button>
