@@ -248,6 +248,7 @@ details[open]>summary::before{content:"–"}
 .panel{
   position:relative;isolation:isolate;display:flex;flex-direction:column;justify-content:center;align-items:center;
   width:min(510px,100%);aspect-ratio:1023 / 1537;margin:auto;padding:clamp(47px,7vw,58px) clamp(42px,8vw,66px);
+  overflow:hidden;border-radius:clamp(10px,3.2vw,18px);
   text-align:center;color:var(--parchment);background:center/100% 100% no-repeat url("start-screen-panel-v1.webp");
   filter:drop-shadow(0 25px 32px rgba(0,0,0,.72));animation:panelOpen .3s cubic-bezier(.2,.8,.2,1)
 }
