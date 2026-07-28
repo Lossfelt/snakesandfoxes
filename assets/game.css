@@ -91,13 +91,14 @@ main{width:100%;max-width:650px;padding:5px 12px 46px;display:flex;flex-directio
 .route-swatch.shortest{color:#79e59a;background:currentColor}
 .route-swatch.detour{color:#ffd166;background:currentColor}
 .route-swatch.dead{color:#ff7868;background:currentColor}
-.legal-link{stroke:rgba(246,201,107,.45);stroke-width:5;stroke-linecap:round;filter:url(#softGlow);pointer-events:none}
+.legal-link{stroke:rgba(246,201,107,.32);stroke-width:4.2;stroke-linecap:round;filter:url(#softGlow);pointer-events:none}
 .legal-ring{fill:rgba(255,211,112,.08);stroke:var(--danger);stroke-width:3.4;filter:url(#softGlow);pointer-events:none;transform-box:fill-box;transform-origin:center;animation:legalPulse 1.35s ease-in-out infinite}
-.legal-core{fill:var(--bronze-pale);stroke:#6d3b12;stroke-width:1.4;pointer-events:none}
+.legal-steps{fill:#fff0c0;stroke:#4c260b;stroke-width:1.4;paint-order:stroke fill;font:700 12px/1 ui-monospace,'Cascadia Mono',Menlo,monospace;text-anchor:middle;dominant-baseline:central;pointer-events:none}
 .active-node-ring{fill:none;stroke:rgba(255,236,178,.62);stroke-width:2.2;stroke-dasharray:4 5;pointer-events:none;transform-box:fill-box;transform-origin:center;animation:slowSpin 8s linear infinite}
 .selection-ring{opacity:0;fill:none;stroke:var(--bronze-pale);stroke-width:2.8;stroke-dasharray:6 4;filter:url(#softGlow);transform-box:fill-box;transform-origin:center}
 .p-select .selection-ring{opacity:1;animation:selectedPulse 1.25s ease-in-out infinite}
 .p-select{filter:url(#pieceShadow) drop-shadow(0 0 8px rgba(255,216,133,.66))}
+.player-piece.player-moving{filter:url(#pieceShadow) drop-shadow(0 0 12px rgba(255,225,151,.92))}
 .token-face{transition:opacity .18s ease,filter .18s ease}
 .binding-mark{display:none;pointer-events:none}
 .bound .binding-mark{display:block}

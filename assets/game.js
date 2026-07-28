@@ -301,6 +301,63 @@ const Engine = {
       !this.sectorBanned(player, player.pos, node, rules)
     );
   },
+  advancePlayer(state, discIndex, node){
+    const player = state.players[discIndex];
+    const reachedEdge = ring6.has(node) && !player.touched;
+    player.pos = node;
+    player.steps = Math.max(0,(player.steps || 0) - 1);
+    if (reachedEdge){
+      player.touched = true;
+      player.touchSpoke = spokeOfN(node);
+    }
+    const reachedHome = node === CENTER && player.touched && !player.done;
+    if (reachedHome){
+      player.done = true;
+      player.steps = 0;
+    }
+    return {reachedEdge,reachedHome};
+  },
+  playerRouteKey(player){
+    return [
+      player.pos,
+      player.touched ? 1 : 0,
+      player.touchSpoke == null ? -1 : player.touchSpoke,
+      player.done ? 1 : 0
+    ].join(':');
+  },
+  reachablePlayerRoutes(state, discIndex, rules, currentGraph){
+    const player = state.players[discIndex];
+    const routes = new Map();
+    if (!player || !player.alive || player.done || player.steps <= 0) return routes;
+    const start = player.pos;
+    const initialState = {
+      players:state.players.map(item => ({...item})),
+      dark:state.dark
+    };
+    const queue = [{state:initialState,path:[]}];
+    const seen = new Set([this.playerRouteKey(initialState.players[discIndex])]);
+    for (let cursor = 0; cursor < queue.length; cursor++){
+      const current = queue[cursor];
+      const currentPlayer = current.state.players[discIndex];
+      if (currentPlayer.done || currentPlayer.steps <= 0) continue;
+      for (const node of this.legalMoves(current.state,discIndex,rules,currentGraph)){
+        const nextState = {
+          players:current.state.players.map(item => ({...item})),
+          dark:current.state.dark
+        };
+        this.advancePlayer(nextState,discIndex,node);
+        const path = current.path.concat(node);
+        if (node !== start && !routes.has(node)) routes.set(node,path);
+        const nextPlayer = nextState.players[discIndex];
+        const key = this.playerRouteKey(nextPlayer);
+        if (!nextPlayer.done && nextPlayer.steps > 0 && !seen.has(key)){
+          seen.add(key);
+          queue.push({state:nextState,path});
+        }
+      }
+    }
+    return routes;
+  },
   nearestTargets(state, from, distanceMatrix){
     const targetNodes = [...new Set(this.activePlayerIndices(state).map(index => state.players[index].pos))];
     let minDistance = Infinity;
@@ -707,12 +764,12 @@ function mkPlayerEl(number){
 /* ================= live state ================= */
 let dark = [], players = [], phase = 'ritual', turnNo = 0, activeDisc = -1;
 let pDice = [0,0], eDice = [0,0], cheats = {}, dazzle = 0, blindNext = false;
-let motArmed = false, bindMode = false, bindReturnStatus = '', weaveMode = false, weaveReturnStatus = '', breaches = 0, anyStep = false;
+let motArmed = false, bindMode = false, bindReturnStatus = '', weaveMode = false, weaveReturnStatus = '', playerMoving = false, breaches = 0, anyStep = false;
 let gameVersion = 0, undoStack = [], gameSeed = 0, rng = new SeededRng(1);
 let renderedGraphKey = graph.key;
 const liveState = () => ({players,dark});
 function livingDiscs(){ return players.filter(player => player.alive && !player.done); }
-function targetModeActive(){ return bindMode || weaveMode; }
+function targetModeActive(){ return bindMode || weaveMode || playerMoving; }
 function applyModeGraph(){
   const rule = rulesFor();
   const next = rule.topology === 'wild' && graph.topology === 'wild' && graph.seed === gameSeed
@@ -737,7 +794,7 @@ function reset(){
   players = [0,1].map(number => ({pos:CENTER,alive:true,touched:false,done:false,steps:0,touchSpoke:-1,el:mkPlayerEl(number)}));
   phase = 'ritual'; turnNo = 0; activeDisc = -1; pDice = [0,0]; eDice = [0,0];
   cheats = {mot:false,ild:false,mus:false,jern:false,vev:false};
-  dazzle = 0; blindNext = false; motArmed = false; bindMode = false; bindReturnStatus = ''; weaveMode = false; weaveReturnStatus = '';
+  dazzle = 0; blindNext = false; motArmed = false; bindMode = false; bindReturnStatus = ''; weaveMode = false; weaveReturnStatus = ''; playerMoving = false;
   breaches = 0; anyStep = false;
   document.getElementById('log').innerHTML = '';
   rovingNode = CENTER;
@@ -960,6 +1017,7 @@ function renderAll(){
   updateNodeAccessibility();
 }
 function legalMovesFor(index){ return Engine.legalMoves(liveState(),index,rulesFor(),graph); }
+function reachableRoutesFor(index){ return Engine.reachablePlayerRoutes(liveState(),index,rulesFor(),graph); }
 function renderLegal(){
   legalG.innerHTML = '';
   if (targetModeActive() || phase !== 'move' || activeDisc < 0) { updateNodeAccessibility(); return; }
@@ -967,11 +1025,23 @@ function renderLegal(){
   if (player && player.alive && !player.done){
     el('circle',{cx:XY[player.pos][0],cy:XY[player.pos][1],r:22,class:'active-node-ring'},legalG);
   }
-  for (const node of legalMovesFor(activeDisc)){
-    el('line',{x1:XY[player.pos][0],y1:XY[player.pos][1],x2:XY[node][0],y2:XY[node][1],class:'legal-link'},legalG);
+  const routes = reachableRoutesFor(activeDisc);
+  const drawnEdges = new Set();
+  for (const path of routes.values()){
+    let from = player.pos;
+    for (const node of path){
+      const edgeKey = from + ':' + node;
+      if (!drawnEdges.has(edgeKey)){
+        drawnEdges.add(edgeKey);
+        el('line',{x1:XY[from][0],y1:XY[from][1],x2:XY[node][0],y2:XY[node][1],class:'legal-link'},legalG);
+      }
+      from = node;
+    }
+  }
+  for (const [node,path] of routes){
     const marker = el('g',{class:'legal-marker'},legalG);
-    el('circle',{cx:XY[node][0],cy:XY[node][1],r:13,class:'legal-ring'},marker);
-    el('circle',{cx:XY[node][0],cy:XY[node][1],r:3.5,class:'legal-core'},marker);
+    el('circle',{cx:XY[node][0],cy:XY[node][1],r:15,class:'legal-ring'},marker);
+    el('text',{x:XY[node][0],y:XY[node][1],class:'legal-steps'},marker).textContent = path.length;
   }
   updateNodeAccessibility();
 }
@@ -983,7 +1053,8 @@ function nodeName(index){
 }
 function updateNodeAccessibility(){
   if (!tapNodes.length || !players.length) return;
-  const legal = new Set(phase === 'move' && !targetModeActive() && activeDisc >= 0 ? legalMovesFor(activeDisc) : []);
+  const routes = phase === 'move' && !targetModeActive() && activeDisc >= 0 ? reachableRoutesFor(activeDisc) : new Map();
+  const legal = new Set(routes.keys());
   tapNodes.forEach((circle,index) => {
     const parts = [nodeName(index)];
     const herePlayers = [];
@@ -996,7 +1067,10 @@ function updateNodeAccessibility(){
       if (snakes) parts.push(snakes + (snakes === 1 ? ' slange' : ' slanger'));
       if (foxes) parts.push(foxes + (foxes === 1 ? ' rev' : ' rever'));
     }
-    if (legal.has(index)) parts.push('lovlig trekk');
+    if (legal.has(index)){
+      const steps = routes.get(index).length;
+      parts.push('lovlig mål, ' + steps + ' steg');
+    }
     if (rulesFor().returnRule === 'sector' && activeDisc >= 0){
       const player = players[activeDisc];
       if (player && player.touched && index !== CENTER && spokeOfN(index) >= 0 && circDist(spokeOfN(index),player.touchSpoke) >= 4) parts.push('gyldig hjemsektor');
@@ -1120,17 +1194,30 @@ function beginPlayerTurn(){
   if (activeDisc >= 0) rovingNode = players[activeDisc].pos;
   status('Runde <b>' + turnNo + '</b>. Du kastet <b>' + pDice[0] + '</b> og <b>' + pDice[1] + '</b>.' +
     (living.length === 1 ? (soloUsesHighest ? ' Den siste brikken bruker den høyeste terningen: <b>' + soloSteps + '</b> steg.' : ' Den siste brikken bruker begge.') : '') +
-    ' Velg en brikke og et gult felt; du kan stoppe før alle steg er brukt.');
+    ' Velg en brikke og et markert mål. Tallet viser korteste lovlige rute; du kan stoppe før alle steg er brukt.');
   log('Du kaster ' + pDice[0] + ' og ' + pDice[1] + '.');
   renderAll(); renderLegal(); updateHud();
 }
 $('rollBtn').addEventListener('click',() => { if (phase === 'roll' && !targetModeActive()) beginPlayerTurn(); });
+function playerUndoSnapshot(){
+  return {
+    players:players.map(player => ({
+      pos:player.pos,alive:player.alive,touched:player.touched,done:player.done,
+      steps:player.steps,touchSpoke:player.touchSpoke
+    })),
+    activeDisc,anyStep,rovingNode
+  };
+}
 $('undoBtn').addEventListener('click',() => {
   if (phase !== 'move' || targetModeActive() || !undoStack.length) return;
   const snapshot = undoStack.pop();
   players.forEach((player,index) => Object.assign(player,snapshot.players[index]));
   activeDisc = snapshot.activeDisc; anyStep = snapshot.anyStep; rovingNode = snapshot.rovingNode;
-  log('Angret ett steg.'); renderAll(); renderLegal(); updateHud();
+  if (activeDisc >= 0 && players[activeDisc].steps > 0){
+    const name = activeDisc === 0 ? 'I' : 'II';
+    status('Brikke <b>' + name + '</b> er aktiv. Velg et markert mål; tallet viser antall steg.');
+  }
+  log('Angret forrige flytting.'); renderAll(); renderLegal(); updateHud();
 });
 $('swapBtn').addEventListener('click',() => {
   if (phase !== 'move' || targetModeActive() || anyStep) return;
@@ -1138,21 +1225,20 @@ $('swapBtn').addEventListener('click',() => {
   if (living.length === 2) [living[0].steps,living[1].steps] = [living[1].steps,living[0].steps];
   renderLegal(); updateHud();
 });
-function applyPlayerStep(index,node){
+function applyPlayerStep(index,node,options = {}){
   const player = players[index];
-  undoStack.push({
-    players:players.map(p => ({pos:p.pos,alive:p.alive,touched:p.touched,done:p.done,steps:p.steps,touchSpoke:p.touchSpoke})),
-    activeDisc,anyStep,rovingNode
-  });
-  player.pos = node; player.steps--; anyStep = true; rovingNode = node;
-  if (ring6.has(node) && !player.touched){
-    player.touched = true; player.touchSpoke = spokeOfN(node);
+  if (options.recordUndo !== false) undoStack.push(playerUndoSnapshot());
+  const result = Engine.advancePlayer(liveState(),index,node);
+  anyStep = true; rovingNode = node;
+  if (result.reachedEdge){
     log('Brikke ' + (index === 0 ? 'I' : 'II') + ' når kanten av veven.' + (rulesFor().returnRule === 'sector' ? ' Inngangssektoren og gyldige hjem-eiker markeres.' : ''));
   }
-  if (node === CENTER && player.touched && !player.done){
-    player.done = true; player.steps = 0;
+  if (result.reachedHome){
     log('Brikke ' + (index === 0 ? 'I' : 'II') + ' er trygt hjemme.');
-    if (checkWin()) return;
+    if (checkWin()){
+      if (options.render !== false) renderAll();
+      return {...result,won:true};
+    }
     activeDisc = players.findIndex(p => p.alive && !p.done);
     if (activeDisc >= 0) rovingNode = players[activeDisc].pos;
   }
@@ -1160,13 +1246,53 @@ function applyPlayerStep(index,node){
     const next = players.findIndex(p => p.alive && !p.done && p.steps > 0);
     if (next >= 0){ activeDisc = next; rovingNode = players[next].pos; }
   }
-  renderAll(); renderLegal(); updateHud();
+  if (options.render !== false){ renderAll(); renderLegal(); updateHud(); }
+  return {...result,won:false};
 }
-function tapNode(node){
+const PLAYER_MOVE_TIMING = Object.freeze({transition:280,nodePause:90});
+async function waitAtPlayerNode(version){
+  if (reduceMotion) return version === gameVersion;
+  await new Promise(resolve => setTimeout(resolve,PLAYER_MOVE_TIMING.transition + PLAYER_MOVE_TIMING.nodePause));
+  return version === gameVersion;
+}
+async function movePlayerToTarget(index,path){
+  if (playerMoving || phase !== 'move' || !path || !path.length) return;
+  const version = gameVersion;
+  const piece = players[index].el;
+  undoStack.push(playerUndoSnapshot());
+  playerMoving = true;
+  piece.classList.add('player-moving');
+  renderLegal(); renderAll(); updateHud();
+  let moved = 0;
+  try {
+    for (const node of path){
+      if (version !== gameVersion || phase !== 'move') break;
+      const result = applyPlayerStep(index,node,{recordUndo:false,render:false});
+      moved++;
+      renderAll(); updateHud();
+      if (result.won || !await waitAtPlayerNode(version)) break;
+    }
+  } finally {
+    piece.classList.remove('player-moving');
+    playerMoving = false;
+    if (version === gameVersion){
+      if (phase === 'move' && activeDisc >= 0 && players[activeDisc].steps > 0){
+        const name = activeDisc === 0 ? 'I' : 'II';
+        status('Brikke <b>' + name + '</b> er aktiv. Velg et markert mål; tallet viser antall steg.');
+      } else if (phase === 'move'){
+        status('Alle tildelte steg er brukt. Avslutt turen når du er klar.');
+      }
+      renderAll(); renderLegal(); updateHud();
+    }
+  }
+  if (moved && version === gameVersion) log('Brikke ' + (index === 0 ? 'I' : 'II') + ' flytter ' + moved + ' steg.');
+}
+async function tapNode(node){
   if (targetModeActive()) return;
   if (phase !== 'move') return;
-  if (activeDisc >= 0 && legalMovesFor(activeDisc).includes(node)){
-    applyPlayerStep(activeDisc,node);
+  const routes = activeDisc >= 0 ? reachableRoutesFor(activeDisc) : new Map();
+  if (activeDisc >= 0 && routes.has(node)){
+    await movePlayerToTarget(activeDisc,routes.get(node));
     return;
   }
   const here = [];
@@ -1181,6 +1307,8 @@ function selectDisc(index){
   activeDisc = index; rovingNode = player.pos;
   if (rulesFor().returnRule === 'sector' && player.touched){
     status('Brikke <b>' + (index === 0 ? 'I' : 'II') + '</b> valgt. Inngangssektoren er ringet inn; gyldige hjem-eiker lyser ved sentrum.');
+  } else {
+    status('Brikke <b>' + (index === 0 ? 'I' : 'II') + '</b> valgt. Velg et markert mål; tallet viser antall steg.');
   }
   renderAll(); renderLegal(); updateHud();
 }

@@ -27,10 +27,10 @@ Hver kraft kan brukes én gang per spill:
 
 ## Betjening
 
-* Mus eller berøring: Velg og flytt brikker direkte på brettet.
+* Mus eller berøring: Velg en brikke og deretter en markert målnode. Brikken følger den korteste lovlige ruten dit.
 * `Tab`: Flytt fokus til brettet.
 * Piltaster: Naviger mellom felt.
-* `Enter` eller mellomrom: Velg eller flytt.
+* `Enter` eller mellomrom: Velg en brikke eller målnode.
 * `Home`: Gå til sentrum.
 * `Esc`: Avbryt et trygt målvalg eller lukk en dialog.
 
