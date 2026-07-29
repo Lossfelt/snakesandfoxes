@@ -9,3 +9,5 @@
 - [ ] Juster videre på variantene, evt lage nye, for å til slutt finne den beste som så blir hovedversjonen
 - [ ] Juster UI, man bør kunne nå knappene for terning og avslutt tur uten å scrolle vekk fra brettet. Kanskje fjern eller flytt noe forklaring.
 - [ ] Man bør kunne se hvilke fiendebrikker som er i en stack (på både desktop og mobil), slik at man vet om det er bare rever, bare slanger, eller begge deler.
+- [ ] Test ut ulikt antall noder pr sirkel, slik at det vil være en gevinst å bevege seg innover for å komme raskere rundt til andre siden.
+- [ ] Et alternativ til enveiskjøring på sirklene, er at sirklene beveger seg hver runde. Hver sirkel glir én node til siden hver runde, med og mot klokken om hverandre (slik som enveiskjøringene er nå).
