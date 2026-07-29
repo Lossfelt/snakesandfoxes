@@ -11,3 +11,5 @@
 - [ ] Man bør kunne se hvilke fiendebrikker som er i en stack (på både desktop og mobil), slik at man vet om det er bare rever, bare slanger, eller begge deler.
 - [ ] Test ut ulikt antall noder pr sirkel, slik at det vil være en gevinst å bevege seg innover for å komme raskere rundt til andre siden.
 - [ ] Et alternativ til enveiskjøring på sirklene, er at sirklene beveger seg hver runde. Hver sirkel glir én node til siden hver runde, med og mot klokken om hverandre (slik som enveiskjøringene er nå).
+- [ ] Et brett hvor noen tråder er tykke (kan brukes hele tiden), og noen er tynne (de ryker etter én gangs bruk og reduserer dermed antall mulige veier). Kanskje det er sirklene som er tynne og eikene tykke?
+- [ ] En Power som er å kunne kutte én tråd i løpet av spillet.
