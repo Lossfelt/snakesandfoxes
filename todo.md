@@ -7,9 +7,11 @@
   - Delvis seier med juks: én brikke slapp ut med juks (antall regler brutt er en ytterligere gradering)
   - Tap: begge brikkene ble tatt
 - [ ] Juster videre på variantene, evt lage nye, for å til slutt finne den beste som så blir hovedversjonen
+  - [ ] Ny variant: I det man ankommer en node, så endres enveiskjøringene på de tilknyttede veiene seg.
+  - [ ] Ny variant: Hver sirkel beveger seg ett hakk hver runde, i retning enveiskjøringene.
+  - [ ] Ny variant: Test ut ulikt antall noder pr sirkel, slik at det vil være en gevinst å bevege seg innover for å komme raskere rundt til andre siden.
+  - [ ] Ny variant: Et brett hvor noen tråder er tykke (kan brukes hele tiden), og noen er tynne (de ryker etter én gangs bruk og reduserer dermed antall mulige veier). Kanskje det er sirklene som er tynne og eikene tykke?
 - [ ] Juster UI, man bør kunne nå knappene for terning og avslutt tur uten å scrolle vekk fra brettet. Kanskje fjern eller flytt noe forklaring.
 - [ ] Man bør kunne se hvilke fiendebrikker som er i en stack (på både desktop og mobil), slik at man vet om det er bare rever, bare slanger, eller begge deler.
-- [ ] Test ut ulikt antall noder pr sirkel, slik at det vil være en gevinst å bevege seg innover for å komme raskere rundt til andre siden.
-- [ ] Et alternativ til enveiskjøring på sirklene, er at sirklene beveger seg hver runde. Hver sirkel glir én node til siden hver runde, med og mot klokken om hverandre (slik som enveiskjøringene er nå).
-- [ ] Et brett hvor noen tråder er tykke (kan brukes hele tiden), og noen er tynne (de ryker etter én gangs bruk og reduserer dermed antall mulige veier). Kanskje det er sirklene som er tynne og eikene tykke?
 - [ ] En Power som er å kunne kutte én tråd i løpet av spillet.
+- [ ] Kollaps Powers under én knapp
