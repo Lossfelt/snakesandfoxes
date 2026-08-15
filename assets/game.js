@@ -727,9 +727,12 @@ for (let i = 0; i < N; i++){
 /* ================= pieces ================= */
 function mkDarkEl(type, index){
   const group = el('g',{class:'piece dark-piece ' + (type === 'S' ? 'snake-piece' : 'fox-piece'),tabindex:'-1',role:'button','aria-disabled':'true','data-dark-index':index,filter:'url(#pieceShadow)'});
+  // A narrow species-colored backing remains visible between piled tokens.
+  // This makes mixed stacks legible without adding another interaction.
+  el('circle',{r:20.5,class:'stack-edge'},group);
   const face = el('g',{class:'token-face'},group);
   el('image',{
-    href:type === 'S' ? 'assets/piece-enemy-snake.png' : 'assets/piece-enemy-fox.png',
+    href:type === 'S' ? 'assets/piece-enemy-snake.png' : 'assets/piece-enemy-fox-inverted-v3.png',
     x:-19,y:-19,width:38,height:38,
     preserveAspectRatio:'xMidYMid meet'
   },face);
@@ -810,8 +813,10 @@ function stackOffset(index, position){
     const angle = -Math.PI / 2 + stackIndex * (Math.PI * 2 / peers.length);
     return [Math.cos(angle) * radius, Math.sin(angle) * radius];
   }
-  const angle = stackIndex * 2.4;
-  return [Math.cos(angle) * stackIndex * 4.5, Math.sin(angle) * stackIndex * 4.5];
+  // Keep the normal pile directional and compact so each layer reads as a
+  // physical token edge. Bind mode still fans the pieces out for selection.
+  const step = 4.5;
+  return [stackIndex * step, -stackIndex * step];
 }
 function darkPiecePoint(index,position,lift = 0){
   const [ox,oy] = stackOffset(index,position);

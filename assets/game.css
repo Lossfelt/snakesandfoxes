@@ -79,6 +79,9 @@ main{width:100%;max-width:650px;padding:5px 12px 46px;display:flex;flex-directio
 /* board pieces and interaction */
 .piece{transition:transform .28s cubic-bezier(.2,.7,.2,1),filter .18s ease,opacity .18s ease;transform-box:fill-box;transform-origin:center;will-change:transform}
 .dark-piece{transition:transform 500ms cubic-bezier(.18,.72,.18,1),filter .18s ease,opacity .18s ease;will-change:transform}
+.stack-edge{pointer-events:none;stroke-width:1.15}
+.snake-piece .stack-edge{fill:#ead9ad;stroke:#69441f}
+.fox-piece .stack-edge{fill:#2a211d;stroke:#c0934e}
 .dark-piece.enemy-moving{filter:url(#pieceShadow) drop-shadow(0 0 9px rgba(255,214,133,.78))}
 .tapnode{fill:transparent;cursor:pointer}
 .tapnode:focus{outline:none;fill:rgba(239,190,84,.12);stroke:var(--bronze-pale);stroke-width:3.2;filter:url(#softGlow)}

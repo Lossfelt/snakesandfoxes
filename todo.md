@@ -15,3 +15,4 @@
 - [ ] Man bør kunne se hvilke fiendebrikker som er i en stack (på både desktop og mobil), slik at man vet om det er bare rever, bare slanger, eller begge deler.
 - [ ] En Power som er å kunne kutte én tråd i løpet av spillet.
 - [ ] Kollaps Powers under én knapp
+- [ ] kan teste at slangene ikke MÅ flytte tre steg, og at revene ikke MÅ bruke to hopp
