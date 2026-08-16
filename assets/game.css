@@ -86,14 +86,6 @@ main{width:100%;max-width:650px;padding:5px 12px 46px;display:flex;flex-directio
 .tapnode{fill:transparent;cursor:pointer}
 .tapnode:focus{outline:none;fill:rgba(239,190,84,.12);stroke:var(--bronze-pale);stroke-width:3.2;filter:url(#softGlow)}
 .route-arrow,.route-arrow-glow{transition:stroke .18s ease,opacity .18s ease,stroke-width .18s ease}
-#routeLegend{display:flex;align-items:center;justify-content:center;gap:8px 13px;flex-wrap:wrap;padding:5px 7px 1px;font:600 .58rem/1.25 ui-monospace,'Cascadia Mono',Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--parchment-dim)}
-#routeLegend[hidden]{display:none}
-.route-goal{width:100%;text-align:center;color:var(--bronze-pale);letter-spacing:.12em}
-.route-key{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
-.route-swatch{width:17px;height:4px;border-radius:4px;box-shadow:0 0 6px currentColor}
-.route-swatch.shortest{color:#79e59a;background:currentColor}
-.route-swatch.detour{color:#ffd166;background:currentColor}
-.route-swatch.dead{color:#ff7868;background:currentColor}
 .legal-link{stroke:rgba(246,201,107,.32);stroke-width:4.2;stroke-linecap:round;filter:url(#softGlow);pointer-events:none}
 .legal-ring{fill:rgba(255,211,112,.08);stroke:var(--danger);stroke-width:3.4;filter:url(#softGlow);pointer-events:none;transform-box:fill-box;transform-origin:center;animation:legalPulse 1.35s ease-in-out infinite}
 .legal-steps{fill:#fff0c0;stroke:#4c260b;stroke-width:1.4;paint-order:stroke fill;font:700 12px/1 ui-monospace,'Cascadia Mono',Menlo,monospace;text-anchor:middle;dominant-baseline:central;pointer-events:none}
@@ -136,21 +128,6 @@ main{width:100%;max-width:650px;padding:5px 12px 46px;display:flex;flex-directio
   box-shadow:0 12px 30px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,231,186,.08),inset 0 0 0 3px rgba(17,9,5,.28);
 }
 #hud::before{content:"";position:absolute;inset:5px;border:1px solid rgba(224,168,91,.1);border-radius:8px;pointer-events:none}
-#modebar{display:flex;align-items:center;gap:8px;min-height:28px;padding:3px 7px 5px;border-bottom:1px solid rgba(224,168,91,.22);font-family:ui-monospace,'Cascadia Mono',Menlo,monospace;text-transform:uppercase;letter-spacing:.12em}
-#modebar::before{content:"◆";display:grid;place-items:center;width:22px;height:22px;color:var(--bronze-pale);font-size:.72rem;border:1px solid rgba(224,168,91,.5);border-radius:50%;background:rgba(0,0,0,.2);box-shadow:inset 0 0 0 2px rgba(255,224,168,.04)}
-body[data-mode="tidevann"] #modebar::before{content:"≋"}
-body[data-mode="symbol"] #modebar::before{content:"△"}
-body[data-mode="sektor"] #modebar::before{content:"✣"}
-body[data-mode="kutt"] #modebar::before{content:"╱"}
-body[data-mode="villvev"] #modebar::before{content:"↝"}
-#modeBadge{color:var(--bronze-bright);font-size:.67rem;font-weight:700;white-space:nowrap}
-#modeDescriptor{margin-left:auto;color:var(--parchment-faint);font-size:.57rem;letter-spacing:.05em;text-align:right;text-transform:none;line-height:1.25}
-#status{position:relative;font-size:.94rem;line-height:1.45;min-height:3em;color:#2a1a0e;padding:10px 12px 10px 16px;border-radius:8px;background:
-  linear-gradient(100deg,rgba(255,255,255,.25),transparent 32%),
-  linear-gradient(180deg,#ead9ad,#cdb984);
-  border:1px solid #7a5429;box-shadow:inset 0 0 18px rgba(96,53,16,.14),0 3px 7px rgba(0,0,0,.3);text-shadow:0 1px rgba(255,255,255,.35)}
-#status::before{content:"";position:absolute;left:6px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(var(--bronze-dark),var(--bronze-bright),var(--bronze-dark))}
-#status b{color:#713510;font-weight:700}
 #journey{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .journey-card{display:grid;grid-template-columns:auto minmax(58px,1fr);grid-template-areas:"token route" "token status";align-items:center;column-gap:7px;min-height:48px;padding:6px 8px;border:1px solid rgba(224,168,91,.18);border-radius:8px;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.3));font-family:ui-monospace,'Cascadia Mono',Menlo,monospace}
 .journey-token{grid-area:token;display:grid;place-items:center;width:27px;height:27px;border-radius:50%;color:var(--bronze-pale);font:700 .7rem Georgia,serif;background:radial-gradient(circle at 35% 28%,#524432,#17110d 70%);border:1px solid rgba(224,168,91,.5);box-shadow:0 2px 4px rgba(0,0,0,.35)}
@@ -169,8 +146,9 @@ body[data-mode="villvev"] #modebar::before{content:"↝"}
 .journey-card[data-stage="lost"] .journey-token{color:#ff9a8f;border-color:#a34d43}
 .journey-card[data-stage="lost"] .journey-route i,.journey-card[data-stage="lost"] .journey-route b{background:#5c2923;border-color:#8b463d}
 .journey-card[data-stage="lost"] .journey-status{color:#d98b82}
-#dicerow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;font-family:ui-monospace,'Cascadia Mono',Menlo,Consolas,monospace;font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--parchment-dim)}
+#dicerow{display:grid;grid-template-columns:1fr;gap:8px;font-family:ui-monospace,'Cascadia Mono',Menlo,Consolas,monospace;font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--parchment-dim)}
 .dicegrp{display:flex;align-items:center;align-content:center;gap:6px;min-height:49px;padding:7px 8px;border-radius:8px;background:linear-gradient(180deg,rgba(0,0,0,.22),rgba(0,0,0,.34));border:1px solid rgba(224,168,91,.18);box-shadow:inset 0 1px 6px rgba(0,0,0,.4)}
+.dicegrp[hidden]{display:none}
 .die{width:32px;height:32px;border:0;border-radius:7px;position:relative;background:transparent center/100% 100% no-repeat url("die-player.png");box-shadow:0 3px 5px rgba(0,0,0,.5);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:5px;gap:1px;animation:dieDrop .22s ease-out both}
 .die::after{content:"";position:absolute;inset:2px;border-radius:6px;box-shadow:inset 0 1px 1px rgba(255,245,218,.18),inset 0 -1px 1px rgba(25,10,3,.2);pointer-events:none}
 .die.enemy{background-image:url("die-enemy.png");box-shadow:0 3px 5px rgba(0,0,0,.58)}
@@ -289,8 +267,6 @@ details[open]>summary::before{content:"–"}
   main{padding:4px 10px 36px;gap:10px}
   #boardwrap{border-radius:12px;padding:2px}
   #hud{padding:10px;gap:9px}
-  #modeDescriptor{display:none}
-  #status{font-size:.88rem;padding:9px 10px 9px 15px}
   #dicerow{grid-template-columns:1fr;gap:6px}
   .dicegrp{min-height:43px;padding:5px 7px}
   #mainbtns{gap:7px}

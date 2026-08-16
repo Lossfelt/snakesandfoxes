@@ -11,23 +11,13 @@
 </head>
 <body>
 <header>
-  <div class="eyebrow">Et barnespill fra De to elver</div>
   <h1>Slanger <em>og</em> rever</h1>
-  <div class="subtitle">Ingen vinner uten å bryte reglene <span class="vtag">· v5</span></div>
 </header>
 
 <main>
   <div id="boardwrap"></div>
 
   <section id="hud">
-    <div id="modebar" aria-label="Valgt regelsett"><span id="modeBadge">v2 Symbol</span><span id="modeDescriptor">Seks symbolterninger og artsulik bevegelse.</span></div>
-    <div id="routeLegend" hidden aria-live="polite">
-      <span class="route-goal" id="routeGoal">Mål: ytterringen</span>
-      <span class="route-key"><span class="route-swatch shortest"></span>korteste vei</span>
-      <span class="route-key"><span class="route-swatch detour"></span>mulig omvei</span>
-      <span class="route-key"><span class="route-swatch dead"></span>blindvei eller blokkert</span>
-    </div>
-    <div id="status" aria-live="polite">Tegn tegnet for å begynne.</div>
     <div id="journey" aria-label="Brikkenes reise">
       <div class="journey-card" id="journey0" data-stage="out">
         <span class="journey-token" aria-hidden="true">I</span>
@@ -41,8 +31,8 @@
       </div>
     </div>
     <div id="dicerow">
-      <div class="dicegrp">Dine <span id="pdice"></span><button id="swapBtn" disabled>bytt</button><button id="undoBtn" disabled>angre</button></div>
-      <div class="dicegrp">Fienden <span id="edice"></span></div>
+      <div class="dicegrp" id="playerDiceGroup">Dine <span id="pdice"></span><button id="swapBtn" disabled>bytt</button><button id="undoBtn" disabled>angre</button></div>
+      <div class="dicegrp" id="enemyDiceGroup">Fienden <span id="edice"></span></div>
     </div>
     <div id="mainbtns">
       <button class="big" id="rollBtn" disabled>Kast terningene</button>

@@ -908,8 +908,6 @@ function setArrowAppearance(visual,state){
 }
 function resetArrowGuidance(){
   arrowVisuals.forEach(visual => setArrowAppearance(visual,'base'));
-  const legend = document.getElementById('routeLegend');
-  if (legend) legend.hidden = true;
 }
 function playerNavigationAdjacency(playerIndex){
   const player = players[playerIndex];
@@ -972,7 +970,6 @@ function updateArrowGuidance(){
   const toGoal = distancesToTargets(targets,adjacency);
   const shortestLength = toGoal[player.pos];
   const allowedSets = adjacency.map(list => new Set(list));
-  let shortest = 0, detour = 0, dead = 0;
   for (const visual of arrowVisuals){
     if (fromStart[visual.from] < 0 || targetSet.has(visual.from)){
       setArrowAppearance(visual,'inactive');
@@ -981,24 +978,12 @@ function updateArrowGuidance(){
     let state;
     if (!allowedSets[visual.from].has(visual.to) || toGoal[visual.to] < 0){
       state = 'dead';
-      dead++;
     } else if (shortestLength >= 0 && fromStart[visual.from] + 1 + toGoal[visual.to] === shortestLength){
       state = 'shortest';
-      shortest++;
     } else {
       state = 'detour';
-      detour++;
     }
     setArrowAppearance(visual,state);
-  }
-  const legend = document.getElementById('routeLegend');
-  const goal = document.getElementById('routeGoal');
-  if (legend) legend.hidden = false;
-  if (goal){
-    const destination = player.touched ? 'sentrum' : 'ytterringen';
-    const routeStatus = shortestLength < 0 ? ' · ingen åpen rute akkurat nå' : ' · korteste avstand ' + shortestLength + ' steg';
-    goal.textContent = 'Mål: ' + destination + routeStatus;
-    legend?.setAttribute('aria-label','Navigasjon mot ' + destination + ': ' + shortest + ' grønne korteste piler, ' + detour + ' gule omveier og ' + dead + ' røde blindveier eller blokkerte piler.');
   }
 }
 function renderAll(){
@@ -1121,6 +1106,10 @@ function appendPlayerDie(container,player,index,value){
 }
 function drawDice(){
   const playerDice = $('pdice'), enemyDice = $('edice');
+  const playerGroup = $('playerDiceGroup'), enemyGroup = $('enemyDiceGroup');
+  const enemyTurn = phase === 'dark';
+  playerGroup.hidden = enemyTurn;
+  enemyGroup.hidden = !enemyTurn;
   playerDice.innerHTML = ''; enemyDice.innerHTML = '';
   let playerCount = 0;
   players.forEach((player,index) => {
@@ -1137,7 +1126,8 @@ function drawDice(){
     enemyDice.appendChild(pipDie(eDice[1],true,'Fiendeterning to: ' + (eDice[1] || 0)));
   }
 }
-function status(html){ $('status').innerHTML = html; }
+let latestStatus = '';
+function status(html){ latestStatus = html; }
 function log(message){
   const item = document.createElement('li');
   item.innerHTML = (turnNo ? '<b>R' + turnNo + '</b> ' : '') + message;
@@ -1330,7 +1320,7 @@ function flashPower(kind){
 }
 function beginBindMode(){
   if (cheats.jern || targetModeActive() || !(phase === 'roll' || phase === 'move')) return;
-  bindMode = true; bindReturnStatus = $('status').innerHTML;
+  bindMode = true; bindReturnStatus = latestStatus;
   status('JERN: Velg den markerte slangen eller reven som skal bindes. Hver stablet brikke kan velges direkte. Trykk Jern igjen eller Esc for å avbryte.');
   renderLegal(); renderAll(); updateHud();
   requestAnimationFrame(() => {
@@ -1368,7 +1358,7 @@ function reverseAdjacencyEdge(adjacency,from,to){
 }
 function beginWeaveMode(){
   if (cheats.vev || targetModeActive() || !(phase === 'roll' || phase === 'move')) return;
-  weaveMode = true; weaveReturnStatus = $('status').innerHTML;
+  weaveMode = true; weaveReturnStatus = latestStatus;
   status('VEV: Velg en markert enveispil. Retningen snus for resten av spillet. Trykk Vev igjen eller Esc for å avbryte.');
   renderLegal(); renderAll(); updateHud();
   requestAnimationFrame(() => {
@@ -1661,9 +1651,6 @@ function modeHint(name){
 }
 function renderRulesPanel(){
   document.body.dataset.mode = mode;
-  const badge = $('modeBadge'), descriptor = $('modeDescriptor');
-  if (badge) badge.textContent = rulesFor().label;
-  if (descriptor) descriptor.textContent = rulesFor().short;
   const title = $('selectedModeName'), text = $('selectedModeRules'), body = $('balanceTableBody');
   if (title) title.textContent = rulesFor().label;
   if (text) text.textContent = rulesFor().rules;
