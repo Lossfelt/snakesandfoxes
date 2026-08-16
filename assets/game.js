@@ -1681,6 +1681,9 @@ $('powersBtn').addEventListener('click',() => {
   if (!$('powersBtn').disabled && !powersOverlay.open) powersOverlay.showModal();
 });
 $('closePowersBtn').addEventListener('click',closePowersOverlay);
+powersOverlay.addEventListener('click',event => {
+  if (event.target === powersOverlay) closePowersOverlay();
+});
 function openOverlay(context,closable,focusSelector){
   overlayContext = context;
   overlay.dataset.closable = closable ? 'true' : 'false';

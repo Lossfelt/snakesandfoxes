@@ -227,7 +227,7 @@ details[open]>summary::before{content:"–"}
 #overlay::backdrop{background:radial-gradient(circle at 50% 38%,rgba(75,45,24,.28),rgba(8,5,3,.94) 72%);backdrop-filter:blur(3px)}
 #overlay[open]{display:flex;align-items:center;justify-content:center;padding:max(18px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left))}
 .power-panel{box-sizing:border-box;width:min(570px,calc(100vw - 32px));padding:20px;border:1px solid rgba(221,155,72,.5);border-radius:14px;background:linear-gradient(155deg,#4d3322,var(--leather-deep));box-shadow:0 22px 48px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,231,186,.09);color:var(--parchment)}
-#powersOverlay{max-width:calc(100vw - 32px);border:0;padding:0;background:transparent;color:var(--parchment);overflow:visible}
+#powersOverlay{width:min(570px,calc(100vw - 32px));max-width:calc(100vw - 32px);margin:auto;border:0;padding:0;background:transparent;color:var(--parchment);overflow:visible}
 #powersOverlay::backdrop{background:rgba(8,5,3,.84);backdrop-filter:blur(3px)}
 .power-panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid rgba(224,168,91,.25);padding-bottom:10px}
 .power-panel h2{margin:0;color:var(--bronze-pale);font-size:1.35rem;letter-spacing:.08em;text-transform:uppercase}
