@@ -1148,7 +1148,10 @@ function updateJourney(){
 }
 function updateHud(){
   const lockedByTarget = targetModeActive();
-  $('rollBtn').disabled = phase !== 'roll' || lockedByTarget;
+  const showRollButton = phase === 'roll';
+  $('rollBtn').hidden = !showRollButton;
+  $('darkBtn').hidden = showRollButton;
+  $('rollBtn').disabled = !showRollButton || lockedByTarget;
   $('darkBtn').disabled = phase !== 'move' || lockedByTarget;
   $('swapBtn').disabled = !(phase === 'move' && !lockedByTarget && !anyStep && livingDiscs().length === 2);
   $('undoBtn').disabled = !(phase === 'move' && !lockedByTarget && undoStack.length);

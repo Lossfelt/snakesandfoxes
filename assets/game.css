@@ -173,7 +173,8 @@ main{width:100%;max-width:650px;padding:5px 12px 46px;display:flex;flex-directio
 #swapBtn:hover,#undoBtn:hover{color:#ffe3a5}
 #swapBtn:disabled,#undoBtn:disabled{display:none}
 
-#mainbtns{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+#mainbtns{display:grid;grid-template-columns:1fr;gap:9px}
+button.big[hidden]{display:none}
 button.big{position:relative;isolation:isolate;overflow:hidden;width:100%;min-height:50px;padding:12px 10px;font-family:inherit;font-size:.94rem;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:#291507;text-shadow:0 1px rgba(255,238,192,.38);background:linear-gradient(180deg,#e1a85b 0%,#c38237 52%,#a96327 100%);border:1px solid #f0c678;border-radius:8px;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,245,209,.5),inset 0 -3px 0 rgba(91,49,16,.36),0 4px 0 #603713,0 7px 13px rgba(0,0,0,.42);transition:transform .12s ease,filter .18s ease,box-shadow .12s ease}
 button.big::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(110deg,transparent 18%,rgba(255,255,255,.25) 45%,transparent 70%);transform:translateX(-120%);transition:transform .45s ease}
 button.big:hover:not(:disabled)::before{transform:translateX(120%)}
