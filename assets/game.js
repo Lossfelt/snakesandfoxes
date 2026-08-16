@@ -1153,6 +1153,7 @@ function updateHud(){
   $('darkBtn').hidden = showRollButton;
   $('rollBtn').disabled = !showRollButton || lockedByTarget;
   $('darkBtn').disabled = phase !== 'move' || lockedByTarget;
+  $('powersBtn').disabled = phase === 'ritual' || phase === 'over';
   $('swapBtn').disabled = !(phase === 'move' && !lockedByTarget && !anyStep && livingDiscs().length === 2);
   $('undoBtn').disabled = !(phase === 'move' && !lockedByTarget && undoStack.length);
   $('pickBtn').disabled = phase === 'dark' || lockedByTarget;
@@ -1397,18 +1398,18 @@ function reverseWeaveEdge(from,to){
 }
 $('chMot').addEventListener('click',() => {
   if (cheats.mot || targetModeActive()) return;
-  cheats.mot = true; motArmed = true; breach('MOT er påkalt. Neste kast dobles.'); flashPower('mot'); updateHud();
+  cheats.mot = true; motArmed = true; breach('MOT er påkalt. Neste kast dobles.'); flashPower('mot'); updateHud(); closePowersOverlay();
 });
 $('chIld').addEventListener('click',() => {
   if (cheats.ild || targetModeActive()) return;
-  cheats.ild = true; blindNext = true; breach('ILD blinder fienden. Neste fiendefase står de stille.'); flashPower('ild'); updateHud();
+  cheats.ild = true; blindNext = true; breach('ILD blinder fienden. Neste fiendefase står de stille.'); flashPower('ild'); updateHud(); closePowersOverlay();
 });
 $('chMus').addEventListener('click',() => {
   if (cheats.mus || targetModeActive()) return;
-  cheats.mus = true; dazzle = 2; breach('MUSIKK blender fienden i to fiendefaser.'); flashPower('mus'); updateHud();
+  cheats.mus = true; dazzle = 2; breach('MUSIKK blender fienden i to fiendefaser.'); flashPower('mus'); updateHud(); closePowersOverlay();
 });
-$('chJern').addEventListener('click',() => { if (bindMode) cancelBindMode(); else beginBindMode(); });
-$('chVev').addEventListener('click',() => { if (weaveMode) cancelWeaveMode(); else beginWeaveMode(); });
+$('chJern').addEventListener('click',() => { if (bindMode) cancelBindMode(); else beginBindMode(); closePowersOverlay(); });
+$('chVev').addEventListener('click',() => { if (weaveMode) cancelWeaveMode(); else beginWeaveMode(); closePowersOverlay(); });
 document.addEventListener('keydown',event => {
   if (event.key !== 'Escape' || $('overlay').open) return;
   if (bindMode){ event.preventDefault(); cancelBindMode(); }
@@ -1673,7 +1674,13 @@ function renderRulesPanel(){
 
 /* ================= dialog and endings ================= */
 const overlay = $('overlay');
+const powersOverlay = $('powersOverlay');
 let overlayContext = 'ritual', pickerOriginalMode = mode;
+function closePowersOverlay(){ if (powersOverlay.open) powersOverlay.close(); }
+$('powersBtn').addEventListener('click',() => {
+  if (!$('powersBtn').disabled && !powersOverlay.open) powersOverlay.showModal();
+});
+$('closePowersBtn').addEventListener('click',closePowersOverlay);
 function openOverlay(context,closable,focusSelector){
   overlayContext = context;
   overlay.dataset.closable = closable ? 'true' : 'false';
