@@ -35,8 +35,8 @@ const RULESETS = {
   vevskifte: {
     label: 'v6 Vevskifte', topology: 'full', enemy: 'symbols', returnRule: 'free',
     shiftOnArrive: true, singleStep: true,
-    short: 'Enveispilene rundt en node snur hver gang en brikke ankommer den.',
-    rules: 'Som v2 Symbol, med nøyaktig de samme enveiskjøringene ved start: bare de indre ringsegmentene er enveis, annenhver ring med og mot klokken. Hver gang en brikke ankommer en node, snur begge ringsegmentene som møtes i den noden. Det gjelder alle brikker, både dine, slangene og revene, og det skjer for hvert enkelt steg, ikke bare på sluttnoden. Snuingene er permanente og hoper seg opp, så det pene vekselmønsteret brytes gradvis ned. Sentrum, ytterringen og hjørnene har ingen ringpiler å snu, så der skjer ingenting. Eikene og ytterringen er alltid toveis, så ingen brikke kan bli innelåst. Fordi veven endrer seg for hvert steg, flytter du én node om gangen: velg en nabonode, så mange ganger som du har steg igjen.'
+    short: 'Enveispilene rundt en node snur ved hver ankomst, og fienden planlegger mot veven slik den blir.',
+    rules: 'Som v2 Symbol, med nøyaktig de samme enveiskjøringene ved start: bare de indre ringsegmentene er enveis, annenhver ring med og mot klokken. Hver gang en brikke ankommer en node, snur begge ringsegmentene som møtes i den noden. Det gjelder alle brikker, både dine, slangene og revene, og det skjer for hvert enkelt steg, ikke bare på sluttnoden. Snuingene er permanente og hoper seg opp, så det pene vekselmønsteret brytes gradvis ned. Sentrum, ytterringen og hjørnene har ingen ringpiler å snu, så der skjer ingenting. Eikene og ytterringen er alltid toveis, så ingen brikke kan bli innelåst. Fordi veven endrer seg for hvert steg, flytter du én node om gangen: velg en nabonode, så mange ganger som du har steg igjen. Slangene og revene kjenner veven bedre enn brikkene dine: de planlegger mot retningene slik de blir etter sine egne ankomster, ikke slik de står nå. En slange velger trestegsruten som holder seg åpen gjennom sine egne vridninger, og en rev velger det sprangparet som lar den stå nærmest byttet etter at landingen har vridd pilene.'
   }
 };
 
@@ -48,18 +48,19 @@ const BALANCE_STATS = {
   sektor: {games:500,wins:10,rate:0.02,low:0.0108991836,high:0.0364201832,avgRounds:4.268,oneSurvivorWins:10},
   kutt: {games:500,wins:145,rate:0.29,low:0.2519474199,high:0.3312548031,avgRounds:4.79,oneSurvivorWins:135},
   villvev: {games:500,wins:23,rate:0.046,low:0.0308451084,high:0.0680777928,avgRounds:25.158,oneSurvivorWins:23},
-  vevskifte: {games:500,wins:127,rate:0.254,low:0.2178202549,high:0.2939309206,avgRounds:4.406,oneSurvivorWins:114}
+  vevskifte: {games:500,wins:92,rate:0.184,low:0.1524894794,high:0.2203291038,avgRounds:4.206,oneSurvivorWins:90}
 };
 const POWER_STATS = 'Bonusmåling for kreftene er ikke kjørt på nytt etter de siste endringene i slangebevegelse og v5-regler, og Vev er foreløpig ikke med i kraftmatrisen. Tallene i tabellen over er derimot oppdatert med en ny simulering (n=500 per modus).';
 
 let mode = 'symbol';
 const rulesFor = (name = mode) => RULESETS[name];
 const SYMBOL_SNAKE_STEPS = 3;
-const symbolSnakeMovement = currentGraph => ({
+const symbolSnakeMovement = (currentGraph, shifting = false) => ({
   adj:currentGraph.out,
   distanceMatrix:currentGraph.dist,
   maxSteps:SYMBOL_SNAKE_STEPS,
-  mustTurn:true
+  mustTurn:true,
+  shiftGraph:shifting ? currentGraph : null
 });
 
 /* ================= seeded randomness ================= */
@@ -285,20 +286,32 @@ function reverseGraphEdge(currentGraph,edgeIndex){
 }
 /* Alle enveispiler som møtes i noden snur. I den fulle veven er det bare de
    indre ringsegmentene som er rettet, så sentrum, ytterringen og hjørnene
-   har ingenting å snu. */
-function shiftArrowsAt(currentGraph,node){
-  if (!(node >= 0)) return false;
-  let changed = false;
+   har ingenting å snu. Vridningen er sin egen omvending: to kall på samme node
+   gir veven tilbake. Derfor kan fiendens søk vri og vri tilbake mens det leter,
+   uten å kopiere hele veven. Avstandene regnes ikke om her; det gjør
+   shiftArrowsAt() når en brikke faktisk ankommer. */
+function toggleArrowsAt(currentGraph,node){
+  const flipped = [];
+  if (!(node >= 0)) return flipped;
   for (let index = 0; index < currentGraph.dirEdges.length; index++){
     const edge = currentGraph.dirEdges[index];
     if (edge[0] !== node && edge[1] !== node) continue;
-    if (reverseGraphEdge(currentGraph,index)) changed = true;
+    const from = edge[0], to = edge[1];
+    if (reverseGraphEdge(currentGraph,index)) flipped.push([from,to]);
   }
-  if (!changed) return false;
+  return flipped;
+}
+function shiftArrowsAt(currentGraph,node){
+  if (!toggleArrowsAt(currentGraph,node).length) return false;
   currentGraph.shifts = (currentGraph.shifts || 0) + 1;
   currentGraph.key = (currentGraph.baseKey || currentGraph.key) + ':skifte:' + currentGraph.shifts;
   finalizeGraph(currentGraph,Boolean(currentGraph.sectorHome));
   return true;
+}
+/* Avstanden fra hver node inn til ett bestemt mål, som er alt fiendens søk
+   trenger. Én bredde-først-søkning mot pilene, ikke en hel avstandsmatrise. */
+function distancesToTarget(target,predecessors){
+  return bfs(target,predecessors);
 }
 function cloneMutableGraph(source,keySuffix = ''){
   const clone = finalizeGraph({
@@ -457,29 +470,77 @@ const Engine = {
   sameSnakeRoute(left, right){
     return left.captureIn === right.captureIn && left.length === right.length && left.distance === right.distance;
   },
-  snakeRouteScore(prev, from, target, adj, distanceMatrix, stepsLeft, visited){
+  /* Fienden kjenner veven bedre enn brikkene som går i den. Når veven skifter
+     ved hver ankomst, planlegger den derfor mot retningene slik de blir etter
+     sine egne steg, ikke slik de står nå.
+
+     Uten skifte er dette et fast kart, og alt nedenfor koker ned til de samme
+     oppslagene som før. Med skifte vris veven ved hvert prøvde steg og vris
+     tilbake på vei ut igjen, så søket slipper å kopiere den. Forgjengerlistene
+     følger de samme vridningene, så avstanden til byttet er én søkning. */
+  snakeForesight(adj, distanceMatrix, target, shiftGraph){
+    if (!shiftGraph){
+      return {
+        options:from => adj[from],
+        distanceTo:node => distanceMatrix[node][target],
+        enter:() => null,
+        leave:() => {}
+      };
+    }
+    const predecessors = reverseAdjacency(shiftGraph.out);
+    const applyFlips = flipped => { for (const [from,to] of flipped) reverseAdjacencyEdge(predecessors,to,from); };
+    const stack = [];
+    let distances = distancesToTarget(target,predecessors);
+    return {
+      /* Kopi, siden en vridning endrer nabolisten vi holder på å gå gjennom. */
+      options:from => shiftGraph.out[from].slice(),
+      distanceTo:node => distances[node],
+      enter(node){
+        const flipped = toggleArrowsAt(shiftGraph,node);
+        if (!flipped.length) return null;
+        applyFlips(flipped);
+        stack.push(distances);
+        distances = distancesToTarget(target,predecessors);
+        return flipped;
+      },
+      leave(node){
+        applyFlips(toggleArrowsAt(shiftGraph,node));
+        distances = stack.pop();
+      }
+    };
+  },
+  snakeRouteScore(prev, from, target, view, stepsLeft, visited){
     if (from === target) return {captureIn:0,length:0,distance:0};
-    let best = {captureIn:Infinity,length:0,distance:distanceMatrix[from][target]};
+    let best = {captureIn:Infinity,length:0,distance:view.distanceTo(from)};
     if (stepsLeft <= 0) return best;
-    for (const next of adj[from]){
-      if (visited.has(next) || distanceMatrix[next][target] < 0 || !this.isTurningStep(prev,from,next)) continue;
-      const nextVisited = new Set(visited);
-      nextVisited.add(next);
-      const tail = this.snakeRouteScore(from,next,target,adj,distanceMatrix,stepsLeft - 1,nextVisited);
-      const score = {captureIn:Number.isFinite(tail.captureIn) ? tail.captureIn + 1 : Infinity,length:tail.length + 1,distance:tail.distance};
-      if (this.betterSnakeRoute(score,best)) best = score;
+    for (const next of view.options(from)){
+      if (visited.has(next) || !this.isTurningStep(prev,from,next)) continue;
+      const entered = view.enter(next);
+      if (view.distanceTo(next) >= 0){
+        const nextVisited = new Set(visited);
+        nextVisited.add(next);
+        const tail = this.snakeRouteScore(from,next,target,view,stepsLeft - 1,nextVisited);
+        const score = {captureIn:Number.isFinite(tail.captureIn) ? tail.captureIn + 1 : Infinity,length:tail.length + 1,distance:tail.distance};
+        if (this.betterSnakeRoute(score,best)) best = score;
+      }
+      if (entered) view.leave(next);
     }
     return best;
   },
-  chooseSnakeAdvance(state, darkIndex, from, targets, adj, distanceMatrix, random, stepsRemaining){
+  chooseSnakeAdvance(state, darkIndex, from, targets, adj, distanceMatrix, random, stepsRemaining, shiftGraph = null){
     const occupied = this.darkOccupied(state,darkIndex);
     const plans = [];
     for (const target of targets){
-      if (distanceMatrix[from][target] <= 0) continue;
-      for (const next of adj[from]){
-        if (distanceMatrix[next][target] < 0 || !this.isTurningStep(state.dark[darkIndex].lastFrom,from,next)) continue;
-        const tail = this.snakeRouteScore(from,next,target,adj,distanceMatrix,Math.max(0,stepsRemaining - 1),new Set([from,next]));
-        plans.push({node:next,score:{captureIn:Number.isFinite(tail.captureIn) ? tail.captureIn + 1 : Infinity,length:tail.length + 1,distance:tail.distance}});
+      const view = this.snakeForesight(adj,distanceMatrix,target,shiftGraph);
+      if (view.distanceTo(from) <= 0) continue;
+      for (const next of view.options(from)){
+        if (!this.isTurningStep(state.dark[darkIndex].lastFrom,from,next)) continue;
+        const entered = view.enter(next);
+        if (view.distanceTo(next) >= 0){
+          const tail = this.snakeRouteScore(from,next,target,view,Math.max(0,stepsRemaining - 1),new Set([from,next]));
+          plans.push({node:next,score:{captureIn:Number.isFinite(tail.captureIn) ? tail.captureIn + 1 : Infinity,length:tail.length + 1,distance:tail.distance}});
+        }
+        if (entered) view.leave(next);
       }
     }
     if (!plans.length) return -1;
@@ -489,11 +550,11 @@ const Engine = {
     const free = bestNodes.filter(node => !occupied.has(node));
     return random.pick(free.length ? free : bestNodes);
   },
-  canSnakeMove(state, darkIndex, adj, distanceMatrix, stepsRemaining){
+  canSnakeMove(state, darkIndex, adj, distanceMatrix, stepsRemaining, shiftGraph = null){
     const piece = state.dark[darkIndex];
     const info = this.nearestTargets(state,piece.pos,distanceMatrix);
     if (!info) return false;
-    return this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,{pick:items => items[0]},stepsRemaining) >= 0;
+    return this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,{pick:items => items[0]},stepsRemaining,shiftGraph) >= 0;
   },
   chooseAdvance(state, darkIndex, from, target, adj, distanceMatrix, random, options = {}){
     const currentDistance = distanceMatrix[from][target];
@@ -513,7 +574,7 @@ const Engine = {
     const info = this.nearestTargets(state, piece.pos, distanceMatrix);
     if (!info) return {moved:false, captured:[]};
     const next = options.mustTurn
-      ? this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,random,options.remainingSteps || 1)
+      ? this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,random,options.remainingSteps || 1,options.shiftGraph || null)
       : this.chooseAdvance(state,darkIndex,piece.pos,random.pick(info.targets),adj,distanceMatrix,random);
     if (next < 0) return {moved:false, captured:[]};
     const from = piece.pos;
@@ -538,7 +599,48 @@ const Engine = {
     piece.pos = next;
     return {moved:true, from:null, to:next, captured:this.captureAt(state, next)};
   },
-  planFoxHop(state, darkIndex, currentGraph, random){
+  /* Avstanden inn til byttet slik den blir etter at reven har landet og veven
+     har vridd seg rundt landingsnoden. Veven vris tilbake med det samme. */
+  distanceAfterArrival(currentGraph, node, target){
+    const flipped = toggleArrowsAt(currentGraph,node);
+    const distance = distancesToTarget(target,reverseAdjacency(currentGraph.out))[node];
+    if (flipped.length) toggleArrowsAt(currentGraph,node);
+    return distance < 0 ? Infinity : distance;
+  },
+  pickByForesight(candidates, score, random){
+    let best = Infinity, tied = [];
+    for (const candidate of candidates){
+      const value = score(candidate);
+      if (value < best){ best = value; tied = [candidate]; }
+      else if (value === best) tied.push(candidate);
+    }
+    return tied.length ? random.pick(tied) : null;
+  },
+  /* Reven springer to felt om gangen og kan gjøre to sprang. Med en vev som
+     skifter velger den derfor det sprangparet som lar den stå nærmest byttet
+     etter at dens egen landing har vridd pilene. Alle kandidatene er like lange
+     på veven slik den står nå; det er først vridningen som skiller dem. */
+  chooseFoxHopPair(state, darkIndex, from, target, currentGraph, random){
+    const occupied = this.darkOccupied(state, darkIndex);
+    const distance = currentGraph.dist;
+    const plans = [];
+    for (const mid of currentGraph.out[from]){
+      if (distance[mid][target] !== distance[from][target] - 1) continue;
+      for (const land of currentGraph.out[mid]){
+        if (distance[land][target] !== distance[mid][target] - 1) continue;
+        plans.push({mid,land,cost:[this.distanceAfterArrival(currentGraph,land,target),occupied.has(land) ? 1 : 0,occupied.has(mid) ? 1 : 0]});
+      }
+    }
+    if (!plans.length) return null;
+    const compare = (left,right) => {
+      for (let index = 0; index < left.length; index++) if (left[index] !== right[index]) return left[index] - right[index];
+      return 0;
+    };
+    let best = plans[0].cost;
+    for (const plan of plans) if (compare(plan.cost,best) < 0) best = plan.cost;
+    return random.pick(plans.filter(plan => compare(plan.cost,best) === 0));
+  },
+  planFoxHop(state, darkIndex, currentGraph, random, options = {}){
     const piece = state.dark[darkIndex];
     const info = this.nearestTargets(state, piece.pos, currentGraph.dist);
     if (!info) return null;
@@ -549,9 +651,16 @@ const Engine = {
       const landingCandidates = currentGraph.out[mid].filter(node => node !== piece.pos);
       if (!landingCandidates.length) return null;
       const free = landingCandidates.filter(node => !occupied.has(node));
-      const land = random.pick(free.length ? free : landingCandidates);
+      const pool = free.length ? free : landingCandidates;
+      const land = options.shifting
+        ? this.pickByForesight(pool,node => this.distanceAfterArrival(currentGraph,node,target),random)
+        : random.pick(pool);
       const overPlayers = this.activePlayerIndices(state).filter(index => state.players[index].pos === mid);
       return {mid, land, leapt:true, overPlayers};
+    }
+    if (options.shifting){
+      const plan = this.chooseFoxHopPair(state,darkIndex,piece.pos,target,currentGraph,random);
+      return plan ? {mid:plan.mid, land:plan.land, leapt:false, overPlayers:[]} : null;
     }
     const mid = this.chooseAdvance(state, darkIndex, piece.pos, target, currentGraph.out, currentGraph.dist, random);
     if (mid < 0) return null;
@@ -1575,7 +1684,7 @@ async function animateSnakeStepLive(index,adj,matrix,version,options = {}){
   return {moved:true,cancelled:false};
 }
 async function foxHopLive(index,version){
-  const plan = Engine.planFoxHop(liveState(),index,graph,rng);
+  const plan = Engine.planFoxHop(liveState(),index,graph,rng,{shifting:shiftsOnArrive()});
   if (!plan) return {moved:false,leapt:false};
   const piece = dark[index];
   const startPoint = darkPiecePoint(index,piece.pos);
@@ -1617,19 +1726,20 @@ async function runSymbolEnemy(version){
   log('Fienden kaster ' + snakeFaces + ' slangeflater og ' + foxFaces + ' revflater' + (dazzled ? ' (blendet).' : '.'));
   updateHud();
 
-  let snakeMovement = symbolSnakeMovement(graph);
+  let snakeMovement = symbolSnakeMovement(graph,shiftsOnArrive());
   const wokenSnakes = new Set();
   for (let activation = 0; activation < snakeFaces && players.some(player => player.alive); activation++){
-    snakeMovement = symbolSnakeMovement(graph);
+    snakeMovement = symbolSnakeMovement(graph,shiftsOnArrive());
     const choice = Engine.choosePursuer(liveState(),(piece,index) => piece.type === 'S' && !piece.bound && !wokenSnakes.has(index) &&
-      Engine.canSnakeMove(liveState(),index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps),snakeMovement.distanceMatrix,rng);
+      Engine.canSnakeMove(liveState(),index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps,snakeMovement.shiftGraph),snakeMovement.distanceMatrix,rng);
     if (!choice) break;
     wokenSnakes.add(choice.index);
     for (let step = 0; step < snakeMovement.maxSteps; step++){
-      snakeMovement = symbolSnakeMovement(graph);
+      snakeMovement = symbolSnakeMovement(graph,shiftsOnArrive());
       const stepResult = await animateSnakeStepLive(choice.index,snakeMovement.adj,snakeMovement.distanceMatrix,version,{
         mustTurn:snakeMovement.mustTurn,
-        remainingSteps:snakeMovement.maxSteps - step
+        remainingSteps:snakeMovement.maxSteps - step,
+        shiftGraph:snakeMovement.shiftGraph
       });
       if (stepResult.cancelled) return false;
       if (!stepResult.moved) break;
@@ -2028,18 +2138,20 @@ function simEnemySymbols(state,random){
   const dice = dazzled ? 3 : 6;
   let snakeFaces = 0, foxFaces = 0;
   for (let i = 0; i < dice; i++){ const roll = random.int(6); if (roll < 2) snakeFaces++; else if (roll < 4) foxFaces++; }
-  let snakeMovement = symbolSnakeMovement(state.graph);
+  const shifting = Boolean(state.rules.shiftOnArrive);
+  let snakeMovement = symbolSnakeMovement(state.graph,shifting);
   const wokenSnakes = new Set();
   for (let activation = 0; activation < snakeFaces && Engine.activePlayerIndices(state).length; activation++){
-    snakeMovement = symbolSnakeMovement(state.graph);
+    snakeMovement = symbolSnakeMovement(state.graph,shifting);
     const choice = Engine.choosePursuer(state,(piece,index) => piece.type === 'S' && !piece.bound && !wokenSnakes.has(index) &&
-      Engine.canSnakeMove(state,index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps),snakeMovement.distanceMatrix,random);
+      Engine.canSnakeMove(state,index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps,snakeMovement.shiftGraph),snakeMovement.distanceMatrix,random);
     if (!choice) break; wokenSnakes.add(choice.index);
     for (let step = 0; step < snakeMovement.maxSteps; step++){
-      snakeMovement = symbolSnakeMovement(state.graph);
+      snakeMovement = symbolSnakeMovement(state.graph,shifting);
       if (!simMoveSnake(state,choice.index,snakeMovement.adj,snakeMovement.distanceMatrix,random,{
         mustTurn:snakeMovement.mustTurn,
-        remainingSteps:snakeMovement.maxSteps - step
+        remainingSteps:snakeMovement.maxSteps - step,
+        shiftGraph:snakeMovement.shiftGraph
       })) break;
       if (!Engine.activePlayerIndices(state).length) break;
     }
@@ -2049,7 +2161,7 @@ function simEnemySymbols(state,random){
     const choice = Engine.choosePursuer(state,(piece,index) => piece.type === 'F' && !piece.bound && !wokenFoxes.has(index),state.graph.dist,random);
     if (!choice) break; wokenFoxes.add(choice.index);
     for (let hop = 0; hop < 2; hop++){
-      const plan = Engine.planFoxHop(state,choice.index,state.graph,random); if (!plan) break;
+      const plan = Engine.planFoxHop(state,choice.index,state.graph,random,{shifting}); if (!plan) break;
       state.dark[choice.index].pos = plan.land; Engine.captureAt(state,plan.land);
       simShiftOnArrival(state,plan.land);
       if (plan.leapt || !Engine.activePlayerIndices(state).length) break;

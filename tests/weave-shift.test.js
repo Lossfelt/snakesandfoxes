@@ -23,11 +23,11 @@ const context = {
 
 vm.runInNewContext(
   gameSource.slice(0,coreEnd) +
-    "\nglobalThis.__gameTest = {RULESETS,graphForMode,shiftArrowsAt,cloneMutableGraph,nodes,id,CENTER,S,R};",
+    "\nglobalThis.__gameTest = {RULESETS,graphForMode,shiftArrowsAt,toggleArrowsAt,cloneMutableGraph,Engine,symbolSnakeMovement,nodes,id,CENTER,S,R};",
   context
 );
 
-const {RULESETS,graphForMode,shiftArrowsAt,cloneMutableGraph,nodes,id,CENTER,S,R} = context.__gameTest;
+const {RULESETS,graphForMode,shiftArrowsAt,toggleArrowsAt,cloneMutableGraph,Engine,symbolSnakeMovement,nodes,id,CENTER,S,R} = context.__gameTest;
 
 const plain = edge => Array.from(edge);
 const plainEdges = graph => graph.dirEdges.map(plain);
@@ -130,4 +130,110 @@ test("v6 flytter én node om gangen", () => {
   assert.equal(RULESETS.vevskifte.shiftOnArrive,true);
   assert.equal(RULESETS.symbol.singleStep,undefined);
   assert.equal(RULESETS.symbol.shiftOnArrive,undefined);
+});
+
+/* ===== fiendens framsyn ===== */
+
+const deterministic = {pick:items => items[0] ?? null};
+
+function enemyState(snakeAt,playerAt,extra = []){
+  return {
+    players:[{pos:playerAt,alive:true,done:false,touched:false,touchSpoke:-1}],
+    dark:[{pos:snakeAt,type:"S",bound:false,lastFrom:-1},...extra]
+  };
+}
+
+test("slangesøket legger veven tilbake slik den var", () => {
+  const graph = graphForMode("vevskifte","frø");
+  const movement = symbolSnakeMovement(graph,true);
+  const state = enemyState(id["5,3"],id["2,6"]);
+  const before = plainEdges(graph);
+  const beforeOut = graph.out.map(list => Array.from(list).sort((a,b) => a - b));
+  Engine.chooseSnakeAdvance(state,0,state.dark[0].pos,[state.players[0].pos],
+    movement.adj,movement.distanceMatrix,deterministic,movement.maxSteps,movement.shiftGraph);
+  assert.deepEqual(plainEdges(graph),before,"pilene er urørt etter søket");
+  assert.deepEqual(graph.out.map(list => Array.from(list).sort((a,b) => a - b)),beforeOut,"nabolistene er urørt");
+});
+
+test("revesøket legger veven tilbake slik den var", () => {
+  const graph = graphForMode("vevskifte","frø");
+  const state = {
+    players:[{pos:id["2,6"],alive:true,done:false,touched:false,touchSpoke:-1}],
+    dark:[{pos:id["5,4"],type:"F",bound:false,lastFrom:-1}]
+  };
+  const before = plainEdges(graph);
+  Engine.planFoxHop(state,0,graph,deterministic,{shifting:true});
+  assert.deepEqual(plainEdges(graph),before);
+});
+
+test("framsynet endrer faktisk hvilket trekk fienden velger", () => {
+  let differences = 0, total = 0;
+  for (let trial = 0; trial < 6; trial++){
+    const graph = graphForMode("vevskifte","frø" + trial);
+    /* En vev som alt er vridd noen ganger, slik den er midt i et spill. */
+    for (let step = 0; step < trial * 4; step++) shiftArrowsAt(graph,1 + ((step * 13 + trial) % (S * R)));
+    const movement = symbolSnakeMovement(graph,true);
+    for (const ring of [3,4,5]) for (let spoke = 0; spoke < S; spoke++){
+      const state = enemyState(id[ring + "," + spoke],id["2," + ((spoke + 5) % S)]);
+      const blind = Engine.chooseSnakeAdvance(state,0,state.dark[0].pos,[state.players[0].pos],
+        movement.adj,movement.distanceMatrix,deterministic,movement.maxSteps,null);
+      const seeing = Engine.chooseSnakeAdvance(state,0,state.dark[0].pos,[state.players[0].pos],
+        movement.adj,movement.distanceMatrix,deterministic,movement.maxSteps,movement.shiftGraph);
+      total++;
+      if (blind !== seeing) differences++;
+    }
+  }
+  assert.ok(differences > 0,"minst én stilling der framsynet gir et annet steg (av " + total + ")");
+});
+
+test("framsynet gir aldri et ulovlig steg", () => {
+  const graph = graphForMode("vevskifte","frø");
+  const movement = symbolSnakeMovement(graph,true);
+  for (let spoke = 0; spoke < S; spoke++){
+    const state = enemyState(id["4," + spoke],id["1,0"]);
+    const from = state.dark[0].pos;
+    const next = Engine.chooseSnakeAdvance(state,0,from,[state.players[0].pos],
+      movement.adj,movement.distanceMatrix,deterministic,movement.maxSteps,movement.shiftGraph);
+    if (next < 0) continue;
+    assert.ok(graph.out[from].includes(next),"steget følger en pil som faktisk finnes: " + nodes[from] + " -> " + nodes[next]);
+  }
+});
+
+test("revens sprang følger to virkelige kanter", () => {
+  const graph = graphForMode("vevskifte","frø");
+  for (let spoke = 0; spoke < S; spoke++){
+    const state = {
+      players:[{pos:CENTER,alive:true,done:false,touched:true,touchSpoke:-1}],
+      dark:[{pos:id["4," + spoke],type:"F",bound:false,lastFrom:-1}]
+    };
+    const plan = Engine.planFoxHop(state,0,graph,deterministic,{shifting:true});
+    if (!plan) continue;
+    assert.ok(graph.out[state.dark[0].pos].includes(plan.mid),"første felt finnes");
+    assert.ok(graph.out[plan.mid].includes(plan.land),"andre felt finnes");
+  }
+});
+
+test("uten skifte er søket bit for bit det gamle", () => {
+  const graph = graphForMode("symbol","frø");
+  const movement = symbolSnakeMovement(graph);
+  assert.equal(movement.shiftGraph,null);
+  for (let spoke = 0; spoke < S; spoke++){
+    const state = enemyState(id["5," + spoke],id["2,2"]);
+    const chosen = Engine.chooseSnakeAdvance(state,0,state.dark[0].pos,[state.players[0].pos],
+      movement.adj,movement.distanceMatrix,deterministic,movement.maxSteps);
+    const explicitNull = Engine.chooseSnakeAdvance(state,0,state.dark[0].pos,[state.players[0].pos],
+      movement.adj,movement.distanceMatrix,deterministic,movement.maxSteps,null);
+    assert.equal(chosen,explicitNull);
+  }
+});
+
+test("toggleArrowsAt rapporterer nøyaktig hvilke piler som snudde", () => {
+  const graph = graphForMode("vevskifte","frø");
+  const flipped = toggleArrowsAt(graph,id["3,3"]);
+  assert.equal(flipped.length,2);
+  for (const [from,to] of flipped){
+    assert.ok(from === id["3,3"] || to === id["3,3"],"pilen berører noden");
+    assert.ok(graph.out[to].includes(from),"den rapporterte pilen er snudd");
+  }
+  assert.equal(toggleArrowsAt(graph,CENTER).length,0);
 });
