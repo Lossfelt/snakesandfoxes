@@ -35,7 +35,7 @@ const RULESETS = {
   brenteBroer: {
     label: 'v7 Brente Broer', topology: 'burn', enemy: 'symbols', returnRule: 'free',
     short: 'Ringtrådene ryker etter én bruk; eikene tåler alt.',
-    rules: 'Som v2 Symbol, men veven er vevd av to slags tråder. Eikene er tykke og kan brukes så mange ganger man vil. Alle ringsegmenter er tynne, også i ytterringen: første gang en brikke går over et ringsegment, brenner tråden opp, og segmentet er borte for resten av spillet. Både spillerbrikker, slanger og rever brenner trådene de bruker, og et revesprang brenner begge segmentene det passerer. Hjørnelenkene er innslipp til veven og ryker ikke. Brente tråder vises som mørke, stiplede linjer. Hver node har alltid minst én eike, så ingen brikke kan bli innelåst, men veven mister sidelengs veier for hver runde, og både du og flokken må til slutt gå innover og utover.'
+    rules: 'Som v2 Symbol, men veven er vevd av to slags tråder. Eikene er tykke og kan brukes så mange ganger man vil. Alle ringsegmenter er tynne, også i ytterringen: første gang en brikke går over et ringsegment, brenner tråden opp, og segmentet er borte for resten av spillet. Både spillerbrikker, slanger og rever brenner trådene de bruker, og et revesprang brenner begge segmentene det passerer. Hjørnelenkene er innslipp til veven og ryker ikke. En brent vev kan ta fra fienden trekket den skulle gjort, og da gjelder to unntak: kan ikke en slange svinge fordi tråden den skulle svinge inn på er brent, går den rett fram i stedet, og finner en rev ingen ubrent tråd å lande på bak brikken, stanser den på brikken og tar den. Brente tråder vises som mørke, stiplede linjer. Hver node har alltid minst én eike, så ingen brikke kan bli innelåst, men veven mister sidelengs veier for hver runde, og både du og flokken må til slutt gå innover og utover.'
   }
 };
 
@@ -47,7 +47,7 @@ const BALANCE_STATS = {
   sektor: {games:500,wins:10,rate:0.02,low:0.0108991836,high:0.0364201832,avgRounds:4.268,oneSurvivorWins:10},
   kutt: {games:500,wins:145,rate:0.29,low:0.2519474199,high:0.3312548031,avgRounds:4.79,oneSurvivorWins:135},
   villvev: {games:500,wins:23,rate:0.046,low:0.0308451084,high:0.0680777928,avgRounds:25.158,oneSurvivorWins:23},
-  brenteBroer: {games:500,wins:84,rate:0.168,low:0.1377882330,high:0.2032743291,avgRounds:7.992,oneSurvivorWins:73}
+  brenteBroer: {games:500,wins:73,rate:0.146,low:0.1177487668,high:0.1796492662,avgRounds:4.108,oneSurvivorWins:72}
 };
 const POWER_STATS = 'Bonusmåling for kreftene er ikke kjørt på nytt etter de siste endringene i slangebevegelse og v5-regler, og Vev er foreløpig ikke med i kraftmatrisen. Tallene i tabellen over er derimot oppdatert med en ny simulering (n=500 per modus).';
 
@@ -58,7 +58,9 @@ const symbolSnakeMovement = currentGraph => ({
   adj:currentGraph.out,
   distanceMatrix:currentGraph.dist,
   maxSteps:SYMBOL_SNAKE_STEPS,
-  mustTurn:true
+  mustTurn:true,
+  // I en brent vev kan svingen mangle en trad. Da far slangen ga rett fram.
+  turnOptional:!!currentGraph.burn
 });
 
 /* ================= seeded randomness ================= */
@@ -480,17 +482,24 @@ const Engine = {
     }
     return best;
   },
-  chooseSnakeAdvance(state, darkIndex, from, targets, adj, distanceMatrix, random, stepsRemaining){
-    const occupied = this.darkOccupied(state,darkIndex);
+  snakePlans(state, darkIndex, from, targets, adj, distanceMatrix, stepsRemaining, requireTurn){
     const plans = [];
     for (const target of targets){
       if (distanceMatrix[from][target] <= 0) continue;
       for (const next of adj[from]){
-        if (distanceMatrix[next][target] < 0 || !this.isTurningStep(state.dark[darkIndex].lastFrom,from,next)) continue;
+        if (distanceMatrix[next][target] < 0) continue;
+        if (requireTurn && !this.isTurningStep(state.dark[darkIndex].lastFrom,from,next)) continue;
         const tail = this.snakeRouteScore(from,next,target,adj,distanceMatrix,Math.max(0,stepsRemaining - 1),new Set([from,next]));
         plans.push({node:next,score:{captureIn:Number.isFinite(tail.captureIn) ? tail.captureIn + 1 : Infinity,length:tail.length + 1,distance:tail.distance}});
       }
     }
+    return plans;
+  },
+  chooseSnakeAdvance(state, darkIndex, from, targets, adj, distanceMatrix, random, stepsRemaining, turnOptional = false){
+    const occupied = this.darkOccupied(state,darkIndex);
+    let plans = this.snakePlans(state,darkIndex,from,targets,adj,distanceMatrix,stepsRemaining,true);
+    // Er tråden slangen skulle svinge inn på brent, går den rett fram i stedet.
+    if (!plans.length && turnOptional) plans = this.snakePlans(state,darkIndex,from,targets,adj,distanceMatrix,stepsRemaining,false);
     if (!plans.length) return -1;
     let bestScore = plans[0].score;
     for (const plan of plans.slice(1)) if (this.betterSnakeRoute(plan.score,bestScore)) bestScore = plan.score;
@@ -498,11 +507,11 @@ const Engine = {
     const free = bestNodes.filter(node => !occupied.has(node));
     return random.pick(free.length ? free : bestNodes);
   },
-  canSnakeMove(state, darkIndex, adj, distanceMatrix, stepsRemaining){
+  canSnakeMove(state, darkIndex, adj, distanceMatrix, stepsRemaining, turnOptional = false){
     const piece = state.dark[darkIndex];
     const info = this.nearestTargets(state,piece.pos,distanceMatrix);
     if (!info) return false;
-    return this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,{pick:items => items[0]},stepsRemaining) >= 0;
+    return this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,{pick:items => items[0]},stepsRemaining,turnOptional) >= 0;
   },
   chooseAdvance(state, darkIndex, from, target, adj, distanceMatrix, random, options = {}){
     const currentDistance = distanceMatrix[from][target];
@@ -522,7 +531,7 @@ const Engine = {
     const info = this.nearestTargets(state, piece.pos, distanceMatrix);
     if (!info) return {moved:false, captured:[]};
     const next = options.mustTurn
-      ? this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,random,options.remainingSteps || 1)
+      ? this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,random,options.remainingSteps || 1,options.turnOptional)
       : this.chooseAdvance(state,darkIndex,piece.pos,random.pick(info.targets),adj,distanceMatrix,random);
     if (next < 0) return {moved:false, captured:[]};
     const from = piece.pos;
@@ -556,7 +565,11 @@ const Engine = {
       const mid = target;
       const occupied = this.darkOccupied(state, darkIndex);
       const landingCandidates = currentGraph.out[mid].filter(node => node !== piece.pos);
-      if (!landingCandidates.length) return null;
+      // Er alle trådene bak brikken brent, har reven ingen plass å lande på.
+      // I en brent vev stanser den da på brikken og tar den.
+      if (!landingCandidates.length){
+        return currentGraph.burn ? {mid, land:mid, leapt:false, pounce:true, overPlayers:[]} : null;
+      }
       const free = landingCandidates.filter(node => !occupied.has(node));
       const land = random.pick(free.length ? free : landingCandidates);
       const overPlayers = this.activePlayerIndices(state).filter(index => state.players[index].pos === mid);
@@ -565,7 +578,7 @@ const Engine = {
     const mid = this.chooseAdvance(state, darkIndex, piece.pos, target, currentGraph.out, currentGraph.dist, random);
     if (mid < 0) return null;
     const land = this.chooseAdvance(state, darkIndex, mid, target, currentGraph.out, currentGraph.dist, random);
-    if (land < 0) return null;
+    if (land < 0) return currentGraph.burn ? {mid, land:mid, leapt:false, pounce:true, overPlayers:[]} : null;
     return {mid, land, leapt:false, overPlayers:[]};
   }
 };
@@ -1621,6 +1634,14 @@ async function foxHopLive(index,version){
     log('En rev springer over brikke ' + names + '. Brikken er trygg; reven stanser etter landingen.');
   }
 
+  if (plan.pounce && plan.land === plan.mid){
+    // Ingen ubrent tråd bak brikken: reven stanser på noden i stedet for å springe over.
+    const captured = Engine.captureAt(liveState(),plan.land);
+    if (captured.length) logCaptures(captured,'F',true);
+    else log('En rev stanser på ' + nodeName(plan.land) + '; alle trådene videre er brent.');
+    renderAll();
+    return finish({moved:true,leapt:true});
+  }
   renderFoxHopFx(plan,'land');
   piece.pos = plan.land;
   burnLiveEdge(plan.mid,plan.land);
@@ -1653,13 +1674,14 @@ async function runSymbolEnemy(version){
   for (let activation = 0; activation < snakeFaces && players.some(player => player.alive); activation++){
     snakeMovement = symbolSnakeMovement(graph);
     const choice = Engine.choosePursuer(liveState(),(piece,index) => piece.type === 'S' && !piece.bound && !wokenSnakes.has(index) &&
-      Engine.canSnakeMove(liveState(),index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps),snakeMovement.distanceMatrix,rng);
+      Engine.canSnakeMove(liveState(),index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps,snakeMovement.turnOptional),snakeMovement.distanceMatrix,rng);
     if (!choice) break;
     wokenSnakes.add(choice.index);
     for (let step = 0; step < snakeMovement.maxSteps; step++){
       snakeMovement = symbolSnakeMovement(graph);
       const stepResult = await animateSnakeStepLive(choice.index,snakeMovement.adj,snakeMovement.distanceMatrix,version,{
         mustTurn:snakeMovement.mustTurn,
+        turnOptional:snakeMovement.turnOptional,
         remainingSteps:snakeMovement.maxSteps - step
       });
       if (stepResult.cancelled) return false;
@@ -2064,12 +2086,13 @@ function simEnemySymbols(state,random){
   for (let activation = 0; activation < snakeFaces && Engine.activePlayerIndices(state).length; activation++){
     snakeMovement = symbolSnakeMovement(state.graph);
     const choice = Engine.choosePursuer(state,(piece,index) => piece.type === 'S' && !piece.bound && !wokenSnakes.has(index) &&
-      Engine.canSnakeMove(state,index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps),snakeMovement.distanceMatrix,random);
+      Engine.canSnakeMove(state,index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps,snakeMovement.turnOptional),snakeMovement.distanceMatrix,random);
     if (!choice) break; wokenSnakes.add(choice.index);
     for (let step = 0; step < snakeMovement.maxSteps; step++){
       snakeMovement = symbolSnakeMovement(state.graph);
       if (!simMoveSnake(state,choice.index,snakeMovement.adj,snakeMovement.distanceMatrix,random,{
         mustTurn:snakeMovement.mustTurn,
+        turnOptional:snakeMovement.turnOptional,
         remainingSteps:snakeMovement.maxSteps - step
       })) break;
       if (!Engine.activePlayerIndices(state).length) break;

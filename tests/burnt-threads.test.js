@@ -149,3 +149,61 @@ test("andre regelsett har ingen brennbare tråder", () => {
     assert.equal(burnEdge(graph, id["3,0"], id["3,1"]), false);
   }
 });
+
+test("en slange går rett fram når tråden den skulle svinge inn på er brent", () => {
+  const graph = burnGraph();
+  const snakeNode = id["3,0"], arrivedFrom = id["2,0"];
+  // Ring 3 går én vei; den eneste ringtråden ut fra noden brenner opp.
+  assert.equal(burnEdge(graph, snakeNode, id["3,1"]), true);
+  const state = () => ({
+    players:[{pos:id["1,6"],alive:true,done:false,touched:false,steps:0,touchSpoke:-1}],
+    dark:[{pos:snakeNode,type:"S",bound:false,lastFrom:arrivedFrom}]
+  });
+  const movement = symbolSnakeMovement(graph);
+  assert.equal(movement.turnOptional, true, "en brennbar vev skal tillate at svingen faller bort");
+
+  const blocked = state();
+  assert.equal(
+    Engine.moveSnakeOne(blocked, 0, movement.adj, movement.distanceMatrix, deterministic, {
+      mustTurn:true, turnOptional:false, remainingSteps:movement.maxSteps
+    }).moved,
+    false,
+    "uten unntaket står slangen fast for godt"
+  );
+
+  const freed = state();
+  const result = Engine.moveSnakeOne(freed, 0, movement.adj, movement.distanceMatrix, deterministic, {
+    mustTurn:movement.mustTurn, turnOptional:movement.turnOptional, remainingSteps:movement.maxSteps
+  });
+  assert.equal(result.moved, true, "med unntaket går slangen rett fram");
+  assert.equal(Engine.edgeKind(result.from, result.to), "spoke");
+  assert.equal(
+    Engine.canSnakeMove(freed, 0, movement.adj, movement.distanceMatrix, movement.maxSteps, true),
+    true
+  );
+});
+
+test("en rev uten landingstråd stanser på brikken og tar den", () => {
+  const graph = burnGraph();
+  const prey = id["6,0"], foxNode = id["5,0"];
+  assert.equal(burnEdge(graph, prey, id["6,1"]), true);
+  assert.equal(burnEdge(graph, prey, id["6,11"]), true);
+  assert.deepEqual([...graph.out[prey]], [foxNode], "bare eiken innover står igjen");
+
+  const state = {
+    players:[{pos:prey,alive:true,done:false,touched:true,steps:0,touchSpoke:0}],
+    dark:[{pos:foxNode,type:"F",bound:false,lastFrom:-1}]
+  };
+  assert.equal(Engine.planFoxHop(state, 0, {...graph, burn:false}, deterministic), null,
+    "uten brennbar vev finnes ikke unntaket");
+
+  const plan = Engine.planFoxHop(state, 0, graph, deterministic);
+  assert.ok(plan, "reven skal finne et trekk");
+  assert.equal(plan.pounce, true);
+  assert.equal(plan.mid, prey);
+  assert.equal(plan.land, prey);
+  assert.equal(plan.leapt, false);
+  state.dark[0].pos = plan.land;
+  assert.deepEqual([...Engine.captureAt(state, plan.land)], [0]);
+  assert.equal(state.players[0].alive, false);
+});
