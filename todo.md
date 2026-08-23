@@ -17,3 +17,4 @@
 - [X] Man bør kunne se hvilke fiendebrikker som er i en stack (på både desktop og mobil), slik at man vet om det er bare rever, bare slanger, eller begge deler.
 - [X] Kollaps Powers under én knapp
 - [ ] Nå velges den fienden som er nærmest en spiller (og som ikke har beveget seg denne runden), uavhengig av om den vil være i stand til å fange spilleren. Lag en knapp som skifter mellom dét og at det heller velges den fienden med størst sannsynlighet for å greie å fange en spiller.
+- [ ] Nå har jeg en del varianter, så istedenfor å velge bare én av dem kan jeg heller bygge en løsning hvor hver gang man starter spillet så velges en av dem. Det simulerer det litt kaotiske og uforståelige ved deres verden.
