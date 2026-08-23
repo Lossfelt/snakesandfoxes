@@ -10,7 +10,7 @@
   - [X] Ny variant: I det man ankommer en node, så endres enveiskjøringene på de tilknyttede veiene seg.
   - [ ] Ny variant: Hver sirkel beveger seg ett hakk hver runde, i retning enveiskjøringene.
   - [ ] Ny variant: Test ut ulikt antall noder pr sirkel, slik at det vil være en gevinst å bevege seg innover for å komme raskere rundt til andre siden.
-  - [ ] Ny variant: Et brett hvor noen tråder er tykke (kan brukes hele tiden), og noen er tynne (de ryker etter én gangs bruk og reduserer dermed antall mulige veier). Kanskje det er sirklene som er tynne og eikene tykke?
+  - [X] Ny variant: Et brett hvor noen tråder er tykke (kan brukes hele tiden), og noen er tynne (de ryker etter én gangs bruk og reduserer dermed antall mulige veier). Kanskje det er sirklene som er tynne og eikene tykke? (Implementert som v7 Brente Broer: alle ringsegmenter, også ytterringen, brenner etter én bruk; eiker og hjørnelenker er tykke; både spillere, slanger og rever brenner tråder, og et revesprang brenner begge segmentene.)
 - [ ] En Power som er å kunne kutte én tråd i løpet av spillet.
 - [ ] kan teste at slangene ikke MÅ flytte tre steg, og at revene ikke MÅ bruke to hopp
 - [X] Juster UI, man bør kunne nå knappene for terning og avslutt tur uten å scrolle vekk fra brettet. Kanskje fjern eller flytt noe forklaring.
