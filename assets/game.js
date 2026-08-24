@@ -31,6 +31,17 @@ const RULESETS = {
     label: 'v5 Villvev', topology: 'wild', enemy: 'symbols', returnRule: 'free', soloRule: 'max',
     short: 'Alle indre ringsegmenter og eikesegmenter får ny, tilfeldig retning for hvert spill.',
     rules: 'Som v2 Symbol, men alle indre ringsegmenter og alle eikesegmenter er enveis. Hver enkelt pilretning trekkes på nytt for hvert spill. Ytterringen er fortsatt toveis, og hjørnelenkene slipper alltid fienden inn på brettet. Veven regenereres til det finnes minst én rettet rute som følger pilene fra sentrum til ytterringen, og minst én rettet rute som følger pilene fra ytterringen tilbake til sentrum; det trenger ikke være samme trasé. Gylne piler markerer eiker utover, grønne piler markerer eiker innover, blå piler viser ringer mot klokken, og grå piler viser ringer med klokken. Under spillerens flyttefase skifter pilene til navigasjonsfarger for den aktive brikken: grønn er korteste vei, gul er en mulig omvei, og rød er blindvei eller blokkert retning. Slangene bruker samme trestegs- og svingregel som v2 og følger de trukne enveisretningene. Når bare én spillerbrikke er aktiv, bruker den den høyeste av de to terningene, ikke summen.'
+  },
+  vevskifte: {
+    label: 'v6 Vevskifte', topology: 'full', enemy: 'symbols', returnRule: 'free',
+    shiftOnArrive: true, singleStep: true,
+    short: 'Enveispilene rundt en node snur ved hver ankomst, og fienden planlegger mot veven slik den blir.',
+    rules: 'Som v2 Symbol, med nøyaktig de samme enveiskjøringene ved start: bare de indre ringsegmentene er enveis, annenhver ring med og mot klokken. Hver gang en brikke ankommer en node, snur begge ringsegmentene som møtes i den noden. Det gjelder alle brikker, både dine, slangene og revene, og det skjer for hvert enkelt steg, ikke bare på sluttnoden. Snuingene er permanente og hoper seg opp, så det pene vekselmønsteret brytes gradvis ned. Sentrum, ytterringen og hjørnene har ingen ringpiler å snu, så der skjer ingenting. Eikene og ytterringen er alltid toveis, så ingen brikke kan bli innelåst. Fordi veven endrer seg for hvert steg, flytter du én node om gangen: velg en nabonode, så mange ganger som du har steg igjen. Slangene og revene kjenner veven bedre enn brikkene dine: de planlegger mot retningene slik de blir etter sine egne ankomster, ikke slik de står nå. En slange velger trestegsruten som holder seg åpen gjennom sine egne vridninger, og en rev velger det sprangparet som lar den stå nærmest byttet etter at landingen har vridd pilene.'
+  },
+  brenteBroer: {
+    label: 'v7 Brente Broer', topology: 'burn', enemy: 'symbols', returnRule: 'free',
+    short: 'Dine ringsteg brenner tråden bak deg; eikene tåler alt.',
+    rules: 'Som v2 Symbol, men veven er vevd av to slags tråder. Eikene er tykke og kan brukes så mange ganger man vil. Alle ringsegmenter er tynne, også i ytterringen: første gang en av dine brikker går over et ringsegment, brenner tråden opp, og segmentet er borte for resten av spillet. Bare dine egne bevegelser sliter på veven – slangene og revene løper over de tynne trådene uten å skade dem, men de kan ikke bruke et segment du alt har brent. Brente tråder vises som mørke, stiplede linjer. Hver node har alltid minst én eike, så ingen brikke kan bli innelåst, men hver runde du bruker på å sirkle rundt, tar bort sidelengs veier for både deg og flokken.'
   }
 };
 
@@ -41,18 +52,21 @@ const BALANCE_STATS = {
   symbol: {games:500,wins:77,rate:0.154,low:0.1250106803,high:0.1882653633,avgRounds:4.046,oneSurvivorWins:72},
   sektor: {games:500,wins:10,rate:0.02,low:0.0108991836,high:0.0364201832,avgRounds:4.268,oneSurvivorWins:10},
   kutt: {games:500,wins:145,rate:0.29,low:0.2519474199,high:0.3312548031,avgRounds:4.79,oneSurvivorWins:135},
-  villvev: {games:500,wins:23,rate:0.046,low:0.0308451084,high:0.0680777928,avgRounds:25.158,oneSurvivorWins:23}
+  villvev: {games:500,wins:23,rate:0.046,low:0.0308451084,high:0.0680777928,avgRounds:25.158,oneSurvivorWins:23},
+  vevskifte: {games:500,wins:92,rate:0.184,low:0.1524894794,high:0.2203291038,avgRounds:4.206,oneSurvivorWins:90},
+  brenteBroer: {games:500,wins:99,rate:0.198,low:0.1654311226,high:0.2351739791,avgRounds:4.606,oneSurvivorWins:95}
 };
 const POWER_STATS = 'Bonusmåling for kreftene er ikke kjørt på nytt etter de siste endringene i slangebevegelse og v5-regler, og Vev er foreløpig ikke med i kraftmatrisen. Tallene i tabellen over er derimot oppdatert med en ny simulering (n=500 per modus).';
 
 let mode = 'symbol';
 const rulesFor = (name = mode) => RULESETS[name];
 const SYMBOL_SNAKE_STEPS = 3;
-const symbolSnakeMovement = currentGraph => ({
+const symbolSnakeMovement = (currentGraph, shifting = false) => ({
   adj:currentGraph.out,
   distanceMatrix:currentGraph.dist,
   maxSteps:SYMBOL_SNAKE_STEPS,
-  mustTurn:true
+  mustTurn:true,
+  shiftGraph:shifting ? currentGraph : null
 });
 
 /* ================= seeded randomness ================= */
@@ -142,7 +156,6 @@ function allPairs(adj){
 }
 function finalizeGraph(graph, includeSectorHome = false){
   graph.dist = allPairs(graph.out);
-  graph.distSC = allPairs(graph.outSC);
   graph.outerDist = new Int16Array(N);
   for (let src = 0; src < N; src++){
     let best = 32767;
@@ -251,21 +264,142 @@ function createWildGraph(seed){
   throw new Error('Klarte ikke å lage en spillbar villvev for frø ' + seed + '.');
 }
 const GRAPHS = {full:createGraph(false), cut:createGraph(true)};
-function cloneStaticGraph(source,seed){
+function cloneStaticGraph(source,seed,includeSectorHome = source.topology === 'full'){
   return finalizeGraph({
     key:source.key + ':game:' + seed,
+    baseKey:source.key + ':game:' + seed,
     topology:source.topology,
     cut:source.cut,
     out:source.out.map(next => next.slice()),
     outSC:source.outSC.map(next => next.slice()),
     dirEdges:source.dirEdges.map(edge => edge.slice()),
     randomized:source.randomized
-  },source.topology === 'full');
+  },includeSectorHome);
+}
+function reverseAdjacencyEdge(adjacency,from,to){
+  const index = adjacency[from].indexOf(to);
+  if (index < 0) return false;
+  adjacency[from].splice(index,1);
+  if (!adjacency[to].includes(from)) adjacency[to].push(from);
+  return true;
+}
+function reverseGraphEdge(currentGraph,edgeIndex){
+  const [from,to,kind] = currentGraph.dirEdges[edgeIndex];
+  if (!reverseAdjacencyEdge(currentGraph.out,from,to)) return false;
+  if (!reverseAdjacencyEdge(currentGraph.outSC,to,from)) reverseAdjacencyEdge(currentGraph.outSC,from,to);
+  currentGraph.dirEdges[edgeIndex] = [to,from,kind];
+  return true;
+}
+/* Alle enveispiler som møtes i noden snur. I den fulle veven er det bare de
+   indre ringsegmentene som er rettet, så sentrum, ytterringen og hjørnene
+   har ingenting å snu. Vridningen er sin egen omvending: to kall på samme node
+   gir veven tilbake. Derfor kan fiendens søk vri og vri tilbake mens det leter,
+   uten å kopiere hele veven. Avstandene regnes ikke om her; det gjør
+   shiftArrowsAt() når en brikke faktisk ankommer. */
+function toggleArrowsAt(currentGraph,node){
+  const flipped = [];
+  if (!(node >= 0)) return flipped;
+  for (let index = 0; index < currentGraph.dirEdges.length; index++){
+    const edge = currentGraph.dirEdges[index];
+    if (edge[0] !== node && edge[1] !== node) continue;
+    const from = edge[0], to = edge[1];
+    if (reverseGraphEdge(currentGraph,index)) flipped.push([from,to]);
+  }
+  return flipped;
+}
+function shiftArrowsAt(currentGraph,node){
+  if (!toggleArrowsAt(currentGraph,node).length) return false;
+  currentGraph.shifts = (currentGraph.shifts || 0) + 1;
+  currentGraph.key = (currentGraph.baseKey || currentGraph.key) + ':skifte:' + currentGraph.shifts;
+  finalizeGraph(currentGraph,Boolean(currentGraph.sectorHome));
+  return true;
+}
+/* Avstanden fra hver node inn til ett bestemt mål, som er alt fiendens søk
+   trenger. Én bredde-først-søkning mot pilene, ikke en hel avstandsmatrise. */
+function distancesToTarget(target,predecessors){
+  return bfs(target,predecessors);
+}
+function cloneMutableGraph(source,keySuffix = ''){
+  const clone = finalizeGraph({
+    key:source.key + keySuffix,
+    baseKey:(source.baseKey || source.key) + keySuffix,
+    topology:source.topology,
+    cut:source.cut,
+    shifts:source.shifts || 0,
+    out:source.out.map(next => next.slice()),
+    outSC:source.outSC.map(next => next.slice()),
+    dirEdges:source.dirEdges.map(edge => edge.slice()),
+    randomized:source.randomized
+  },Boolean(source.sectorHome));
+  return clone;
+}
+// Hvem som sliter ut de tynne tradene. Bare spilleren i denne varianten;
+// legg til 'dark' her om fienden ogsa skal brenne trader.
+const BURN_MOVERS = new Set(['player']);
+function createBurnGraph(seed){
+  const burnGraph = cloneStaticGraph(GRAPHS.full,seed);
+  burnGraph.topology = 'burn';
+  burnGraph.burn = true;
+  burnGraph.burnMovers = BURN_MOVERS;
+  burnGraph.burned = new Set();
+  burnGraph.baseKey = 'burn:' + seed;
+  burnGraph.key = burnGraph.baseKey;
+  return burnGraph;
+}
+function cloneBurnGraph(source){
+  return finalizeGraph({
+    key:source.key,
+    baseKey:source.baseKey,
+    topology:'burn',
+    cut:false,
+    burn:true,
+    burnMovers:source.burnMovers,
+    burned:new Set(source.burned),
+    out:source.out.map(next => next.slice()),
+    outSC:source.outSC.map(next => next.slice()),
+    dirEdges:source.dirEdges.map(edge => edge.slice()),
+    randomized:false
+  },false);
+}
+const burnKey = (a,b) => a < b ? a + ':' + b : b + ':' + a;
+// Eikene og hjornelenkene er de tykke tradene; alle ringsegmenter er tynne.
+function isThinEdge(from,to){
+  if (isCorner(from) || isCorner(to)) return false;
+  if (from === CENTER || to === CENTER) return false;
+  return Engine.edgeKind(from,to) === 'ring';
+}
+function isBurnedEdge(currentGraph,from,to){
+  return !!(currentGraph && currentGraph.burned && currentGraph.burned.has(burnKey(from,to)));
+}
+function removeAdjacencyEdge(adjacency,from,to){
+  const index = adjacency[from].indexOf(to);
+  if (index < 0) return false;
+  adjacency[from].splice(index,1);
+  return true;
+}
+function burnEdge(currentGraph,from,to,mover){
+  if (!currentGraph || !currentGraph.burn) return false;
+  if (!currentGraph.burnMovers.has(mover)) return false;
+  if (from == null || to == null || from < 0 || to < 0 || from === to) return false;
+  if (!isThinEdge(from,to)) return false;
+  const key = burnKey(from,to);
+  if (currentGraph.burned.has(key)) return false;
+  currentGraph.burned.add(key);
+  removeAdjacencyEdge(currentGraph.out,from,to);
+  removeAdjacencyEdge(currentGraph.out,to,from);
+  removeAdjacencyEdge(currentGraph.outSC,from,to);
+  removeAdjacencyEdge(currentGraph.outSC,to,from);
+  currentGraph.dirEdges = currentGraph.dirEdges.filter(edge => burnKey(edge[0],edge[1]) !== key);
+  currentGraph.key = currentGraph.baseKey + ':brent' + currentGraph.burned.size;
+  finalizeGraph(currentGraph,false);
+  return true;
 }
 function graphForMode(modeName,seed,isolated = false){
   const rule = rulesFor(modeName);
   if (rule.topology === 'wild') return createWildGraph(seed);
+  if (rule.topology === 'burn') return createBurnGraph(seed);
   const source = GRAPHS[rule.topology];
+  if (rule.shiftOnArrive) return cloneStaticGraph(source,seed,rule.returnRule === 'sector');
   return isolated ? cloneStaticGraph(source,seed) : source;
 }
 let graph = GRAPHS.full;
@@ -404,29 +538,77 @@ const Engine = {
   sameSnakeRoute(left, right){
     return left.captureIn === right.captureIn && left.length === right.length && left.distance === right.distance;
   },
-  snakeRouteScore(prev, from, target, adj, distanceMatrix, stepsLeft, visited){
+  /* Fienden kjenner veven bedre enn brikkene som går i den. Når veven skifter
+     ved hver ankomst, planlegger den derfor mot retningene slik de blir etter
+     sine egne steg, ikke slik de står nå.
+
+     Uten skifte er dette et fast kart, og alt nedenfor koker ned til de samme
+     oppslagene som før. Med skifte vris veven ved hvert prøvde steg og vris
+     tilbake på vei ut igjen, så søket slipper å kopiere den. Forgjengerlistene
+     følger de samme vridningene, så avstanden til byttet er én søkning. */
+  snakeForesight(adj, distanceMatrix, target, shiftGraph){
+    if (!shiftGraph){
+      return {
+        options:from => adj[from],
+        distanceTo:node => distanceMatrix[node][target],
+        enter:() => null,
+        leave:() => {}
+      };
+    }
+    const predecessors = reverseAdjacency(shiftGraph.out);
+    const applyFlips = flipped => { for (const [from,to] of flipped) reverseAdjacencyEdge(predecessors,to,from); };
+    const stack = [];
+    let distances = distancesToTarget(target,predecessors);
+    return {
+      /* Kopi, siden en vridning endrer nabolisten vi holder på å gå gjennom. */
+      options:from => shiftGraph.out[from].slice(),
+      distanceTo:node => distances[node],
+      enter(node){
+        const flipped = toggleArrowsAt(shiftGraph,node);
+        if (!flipped.length) return null;
+        applyFlips(flipped);
+        stack.push(distances);
+        distances = distancesToTarget(target,predecessors);
+        return flipped;
+      },
+      leave(node){
+        applyFlips(toggleArrowsAt(shiftGraph,node));
+        distances = stack.pop();
+      }
+    };
+  },
+  snakeRouteScore(prev, from, target, view, stepsLeft, visited){
     if (from === target) return {captureIn:0,length:0,distance:0};
-    let best = {captureIn:Infinity,length:0,distance:distanceMatrix[from][target]};
+    let best = {captureIn:Infinity,length:0,distance:view.distanceTo(from)};
     if (stepsLeft <= 0) return best;
-    for (const next of adj[from]){
-      if (visited.has(next) || distanceMatrix[next][target] < 0 || !this.isTurningStep(prev,from,next)) continue;
-      const nextVisited = new Set(visited);
-      nextVisited.add(next);
-      const tail = this.snakeRouteScore(from,next,target,adj,distanceMatrix,stepsLeft - 1,nextVisited);
-      const score = {captureIn:Number.isFinite(tail.captureIn) ? tail.captureIn + 1 : Infinity,length:tail.length + 1,distance:tail.distance};
-      if (this.betterSnakeRoute(score,best)) best = score;
+    for (const next of view.options(from)){
+      if (visited.has(next) || !this.isTurningStep(prev,from,next)) continue;
+      const entered = view.enter(next);
+      if (view.distanceTo(next) >= 0){
+        const nextVisited = new Set(visited);
+        nextVisited.add(next);
+        const tail = this.snakeRouteScore(from,next,target,view,stepsLeft - 1,nextVisited);
+        const score = {captureIn:Number.isFinite(tail.captureIn) ? tail.captureIn + 1 : Infinity,length:tail.length + 1,distance:tail.distance};
+        if (this.betterSnakeRoute(score,best)) best = score;
+      }
+      if (entered) view.leave(next);
     }
     return best;
   },
-  chooseSnakeAdvance(state, darkIndex, from, targets, adj, distanceMatrix, random, stepsRemaining){
+  chooseSnakeAdvance(state, darkIndex, from, targets, adj, distanceMatrix, random, stepsRemaining, shiftGraph = null){
     const occupied = this.darkOccupied(state,darkIndex);
     const plans = [];
     for (const target of targets){
-      if (distanceMatrix[from][target] <= 0) continue;
-      for (const next of adj[from]){
-        if (distanceMatrix[next][target] < 0 || !this.isTurningStep(state.dark[darkIndex].lastFrom,from,next)) continue;
-        const tail = this.snakeRouteScore(from,next,target,adj,distanceMatrix,Math.max(0,stepsRemaining - 1),new Set([from,next]));
-        plans.push({node:next,score:{captureIn:Number.isFinite(tail.captureIn) ? tail.captureIn + 1 : Infinity,length:tail.length + 1,distance:tail.distance}});
+      const view = this.snakeForesight(adj,distanceMatrix,target,shiftGraph);
+      if (view.distanceTo(from) <= 0) continue;
+      for (const next of view.options(from)){
+        if (!this.isTurningStep(state.dark[darkIndex].lastFrom,from,next)) continue;
+        const entered = view.enter(next);
+        if (view.distanceTo(next) >= 0){
+          const tail = this.snakeRouteScore(from,next,target,view,Math.max(0,stepsRemaining - 1),new Set([from,next]));
+          plans.push({node:next,score:{captureIn:Number.isFinite(tail.captureIn) ? tail.captureIn + 1 : Infinity,length:tail.length + 1,distance:tail.distance}});
+        }
+        if (entered) view.leave(next);
       }
     }
     if (!plans.length) return -1;
@@ -436,11 +618,11 @@ const Engine = {
     const free = bestNodes.filter(node => !occupied.has(node));
     return random.pick(free.length ? free : bestNodes);
   },
-  canSnakeMove(state, darkIndex, adj, distanceMatrix, stepsRemaining){
+  canSnakeMove(state, darkIndex, adj, distanceMatrix, stepsRemaining, shiftGraph = null){
     const piece = state.dark[darkIndex];
     const info = this.nearestTargets(state,piece.pos,distanceMatrix);
     if (!info) return false;
-    return this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,{pick:items => items[0]},stepsRemaining) >= 0;
+    return this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,{pick:items => items[0]},stepsRemaining,shiftGraph) >= 0;
   },
   chooseAdvance(state, darkIndex, from, target, adj, distanceMatrix, random, options = {}){
     const currentDistance = distanceMatrix[from][target];
@@ -460,7 +642,7 @@ const Engine = {
     const info = this.nearestTargets(state, piece.pos, distanceMatrix);
     if (!info) return {moved:false, captured:[]};
     const next = options.mustTurn
-      ? this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,random,options.remainingSteps || 1)
+      ? this.chooseSnakeAdvance(state,darkIndex,piece.pos,info.targets,adj,distanceMatrix,random,options.remainingSteps || 1,options.shiftGraph || null)
       : this.chooseAdvance(state,darkIndex,piece.pos,random.pick(info.targets),adj,distanceMatrix,random);
     if (next < 0) return {moved:false, captured:[]};
     const from = piece.pos;
@@ -485,7 +667,48 @@ const Engine = {
     piece.pos = next;
     return {moved:true, from:null, to:next, captured:this.captureAt(state, next)};
   },
-  planFoxHop(state, darkIndex, currentGraph, random){
+  /* Avstanden inn til byttet slik den blir etter at reven har landet og veven
+     har vridd seg rundt landingsnoden. Veven vris tilbake med det samme. */
+  distanceAfterArrival(currentGraph, node, target){
+    const flipped = toggleArrowsAt(currentGraph,node);
+    const distance = distancesToTarget(target,reverseAdjacency(currentGraph.out))[node];
+    if (flipped.length) toggleArrowsAt(currentGraph,node);
+    return distance < 0 ? Infinity : distance;
+  },
+  pickByForesight(candidates, score, random){
+    let best = Infinity, tied = [];
+    for (const candidate of candidates){
+      const value = score(candidate);
+      if (value < best){ best = value; tied = [candidate]; }
+      else if (value === best) tied.push(candidate);
+    }
+    return tied.length ? random.pick(tied) : null;
+  },
+  /* Reven springer to felt om gangen og kan gjøre to sprang. Med en vev som
+     skifter velger den derfor det sprangparet som lar den stå nærmest byttet
+     etter at dens egen landing har vridd pilene. Alle kandidatene er like lange
+     på veven slik den står nå; det er først vridningen som skiller dem. */
+  chooseFoxHopPair(state, darkIndex, from, target, currentGraph, random){
+    const occupied = this.darkOccupied(state, darkIndex);
+    const distance = currentGraph.dist;
+    const plans = [];
+    for (const mid of currentGraph.out[from]){
+      if (distance[mid][target] !== distance[from][target] - 1) continue;
+      for (const land of currentGraph.out[mid]){
+        if (distance[land][target] !== distance[mid][target] - 1) continue;
+        plans.push({mid,land,cost:[this.distanceAfterArrival(currentGraph,land,target),occupied.has(land) ? 1 : 0,occupied.has(mid) ? 1 : 0]});
+      }
+    }
+    if (!plans.length) return null;
+    const compare = (left,right) => {
+      for (let index = 0; index < left.length; index++) if (left[index] !== right[index]) return left[index] - right[index];
+      return 0;
+    };
+    let best = plans[0].cost;
+    for (const plan of plans) if (compare(plan.cost,best) < 0) best = plan.cost;
+    return random.pick(plans.filter(plan => compare(plan.cost,best) === 0));
+  },
+  planFoxHop(state, darkIndex, currentGraph, random, options = {}){
     const piece = state.dark[darkIndex];
     const info = this.nearestTargets(state, piece.pos, currentGraph.dist);
     if (!info) return null;
@@ -496,9 +719,16 @@ const Engine = {
       const landingCandidates = currentGraph.out[mid].filter(node => node !== piece.pos);
       if (!landingCandidates.length) return null;
       const free = landingCandidates.filter(node => !occupied.has(node));
-      const land = random.pick(free.length ? free : landingCandidates);
+      const pool = free.length ? free : landingCandidates;
+      const land = options.shifting
+        ? this.pickByForesight(pool,node => this.distanceAfterArrival(currentGraph,node,target),random)
+        : random.pick(pool);
       const overPlayers = this.activePlayerIndices(state).filter(index => state.players[index].pos === mid);
       return {mid, land, leapt:true, overPlayers};
+    }
+    if (options.shifting){
+      const plan = this.chooseFoxHopPair(state,darkIndex,piece.pos,target,currentGraph,random);
+      return plan ? {mid:plan.mid, land:plan.land, leapt:false, overPlayers:[]} : null;
     }
     const mid = this.chooseAdvance(state, darkIndex, piece.pos, target, currentGraph.out, currentGraph.dist, random);
     if (mid < 0) return null;
@@ -621,6 +851,15 @@ function line(a,b,width){
   el('line',{x1:XY[a][0],y1:XY[a][1],x2:XY[b][0],y2:XY[b][1],'stroke-width':w+2.1},haloG);
   el('line',{x1:XY[a][0],y1:XY[a][1],x2:XY[b][0],y2:XY[b][1],'stroke-width':w},webG);
 }
+function burnedLine(a,b,width){
+  // Brent trad: ingen glorie, bare en morkt stiplet rest av trad.
+  el('line',{
+    x1:XY[a][0],y1:XY[a][1],x2:XY[b][0],y2:XY[b][1],
+    'stroke-width':Math.max(1.6,(width || 3.1) - 1.3),
+    stroke:'#2b1109','stroke-dasharray':'5 7',opacity:.5,
+    class:'burned-thread'
+  },webG);
+}
 function drawWeb(currentGraph){
   webShadowG.innerHTML = ''; haloG.innerHTML = ''; webG.innerHTML = ''; chevShadowG.innerHTML = ''; chevG.innerHTML = ''; weaveTargetG.innerHTML = '';
   arrowVisuals.length = 0;
@@ -629,7 +868,9 @@ function drawWeb(currentGraph){
     if (!isCutEdge(r,s,currentGraph.cut)) line(id[r + ',' + s], id[(r + 1) + ',' + s]);
   }
   for (let r = 1; r <= R; r++) for (let s = 0; s < S; s++){
-    line(id[r + ',' + s], id[r + ',' + ((s + 1) % S)], r === R ? 4 : 3.1);
+    const a = id[r + ',' + s], b = id[r + ',' + ((s + 1) % S)], width = r === R ? 4 : 3.1;
+    if (isBurnedEdge(currentGraph,a,b)) burnedLine(a,b,width);
+    else line(a,b,width);
   }
   for (let k = 0; k < 4; k++) for (const s of cornerLinks[k]) line(id['K' + k], id[R + ',' + s], 2.55);
   for (const [a,b,kind] of currentGraph.dirEdges){
@@ -773,6 +1014,18 @@ let renderedGraphKey = graph.key;
 const liveState = () => ({players,dark});
 function livingDiscs(){ return players.filter(player => player.alive && !player.done); }
 function targetModeActive(){ return bindMode || weaveMode || playerMoving; }
+function shiftsOnArrive(){ return Boolean(rulesFor().shiftOnArrive); }
+function redrawWeb(){
+  if (renderedGraphKey === graph.key) return;
+  drawWeb(graph);
+  renderedGraphKey = graph.key;
+}
+/* Enveispilene rundt noden brikken nettopp kom til snur, og brettet tegnes på nytt. */
+function shiftArrowsOnArrival(node){
+  if (!shiftsOnArrive() || !shiftArrowsAt(graph,node)) return false;
+  redrawWeb();
+  return true;
+}
 function applyModeGraph(){
   const rule = rulesFor();
   const next = rule.topology === 'wild' && graph.topology === 'wild' && graph.seed === gameSeed
@@ -780,6 +1033,13 @@ function applyModeGraph(){
     : graphForMode(mode,gameSeed,true);
   graph = next;
   if (renderedGraphKey !== next.key){ drawWeb(next); renderedGraphKey = next.key; }
+}
+function burnLiveEdge(from,to,mover){
+  if (!burnEdge(graph,from,to,mover)) return false;
+  drawWeb(graph);
+  renderedGraphKey = graph.key;
+  log('Tråden mellom ' + nodeName(from) + ' og ' + nodeName(to) + ' brenner opp.');
+  return true;
 }
 function reset(){
   gameVersion++;
@@ -1007,7 +1267,12 @@ function renderAll(){
   updateNodeAccessibility();
 }
 function legalMovesFor(index){ return Engine.legalMoves(liveState(),index,rulesFor(),graph); }
-function reachableRoutesFor(index){ return Engine.reachablePlayerRoutes(liveState(),index,rulesFor(),graph); }
+function reachableRoutesFor(index){
+  /* Når veven skifter for hvert steg, er ruter lenger enn ett steg ikke til å stole
+     på. Da tilbys bare nabonodene, og spilleren går én node om gangen. */
+  if (rulesFor().singleStep) return new Map(legalMovesFor(index).map(node => [node,[node]]));
+  return Engine.reachablePlayerRoutes(liveState(),index,rulesFor(),graph);
+}
 function renderLegal(){
   legalG.innerHTML = '';
   if (targetModeActive() || phase !== 'move' || activeDisc < 0) { updateNodeAccessibility(); return; }
@@ -1176,6 +1441,11 @@ function updateHud(){
   updateJourney(); drawDice(); renderBindTargets(); renderWeaveTargets(); updateNodeAccessibility();
 }
 /* ================= player turn ================= */
+function targetHint(){
+  return rulesFor().singleStep
+    ? 'Velg en nabonode. Veven vrir seg for hvert steg, så du flytter én node om gangen.'
+    : 'Velg et markert mål; tallet viser antall steg.';
+}
 function beginPlayerTurn(){
   turnNo++;
   pDice = [rng.d6(),rng.d6()];
@@ -1193,7 +1463,9 @@ function beginPlayerTurn(){
   if (activeDisc >= 0) rovingNode = players[activeDisc].pos;
   status('Runde <b>' + turnNo + '</b>. Du kastet <b>' + pDice[0] + '</b> og <b>' + pDice[1] + '</b>.' +
     (living.length === 1 ? (soloUsesHighest ? ' Den siste brikken bruker den høyeste terningen: <b>' + soloSteps + '</b> steg.' : ' Den siste brikken bruker begge.') : '') +
-    ' Velg en brikke og et markert mål. Tallet viser korteste lovlige rute; du kan stoppe før alle steg er brukt.');
+    ' Velg en brikke, og deretter ' + (rulesFor().singleStep
+      ? 'en nabonode. Veven vrir seg for hvert steg, så du flytter én node om gangen.'
+      : 'et markert mål. Tallet viser korteste lovlige rute; du kan stoppe før alle steg er brukt.'));
   log('Du kaster ' + pDice[0] + ' og ' + pDice[1] + '.');
   renderAll(); renderLegal(); updateHud();
 }
@@ -1204,19 +1476,46 @@ function playerUndoSnapshot(){
       pos:player.pos,alive:player.alive,touched:player.touched,done:player.done,
       steps:player.steps,touchSpoke:player.touchSpoke
     })),
-    activeDisc,anyStep,rovingNode
+    activeDisc,anyStep,rovingNode,
+    weave:shiftsOnArrive() ? cloneMutableGraph(graph) : null,
+    // Angre skal også veve trådene som brant under trekket tilbake på plass.
+    web:graph.burn ? {
+      key:graph.key,
+      burned:new Set(graph.burned),
+      out:graph.out.map(next => next.slice()),
+      outSC:graph.outSC.map(next => next.slice()),
+      dirEdges:graph.dirEdges.map(edge => edge.slice())
+    } : null
   };
+}
+function restoreWeave(snapshot){
+  if (!snapshot || !snapshot.weave) return;
+  graph = snapshot.weave;
+  redrawWeb();
+}
+function restoreWeb(web){
+  if (!web || !graph.burn) return;
+  graph.burned = new Set(web.burned);
+  graph.out = web.out.map(next => next.slice());
+  graph.outSC = web.outSC.map(next => next.slice());
+  graph.dirEdges = web.dirEdges.map(edge => edge.slice());
+  graph.key = web.key;
+  finalizeGraph(graph,false);
+  drawWeb(graph);
+  renderedGraphKey = graph.key;
 }
 $('undoBtn').addEventListener('click',() => {
   if (phase !== 'move' || targetModeActive() || !undoStack.length) return;
   const snapshot = undoStack.pop();
   players.forEach((player,index) => Object.assign(player,snapshot.players[index]));
+  restoreWeb(snapshot.web);
   activeDisc = snapshot.activeDisc; anyStep = snapshot.anyStep; rovingNode = snapshot.rovingNode;
+  restoreWeave(snapshot);
   if (activeDisc >= 0 && players[activeDisc].steps > 0){
     const name = activeDisc === 0 ? 'I' : 'II';
-    status('Brikke <b>' + name + '</b> er aktiv. Velg et markert mål; tallet viser antall steg.');
+    status('Brikke <b>' + name + '</b> er aktiv. ' + targetHint());
   }
-  log('Angret forrige flytting.'); renderAll(); renderLegal(); updateHud();
+  log('Angret forrige flytting.' + (graph.burn ? ' Trådene som brant under trekket er vevd tilbake.' : '')); renderAll(); renderLegal(); updateHud();
 });
 $('swapBtn').addEventListener('click',() => {
   if (phase !== 'move' || targetModeActive() || anyStep) return;
@@ -1227,8 +1526,11 @@ $('swapBtn').addEventListener('click',() => {
 function applyPlayerStep(index,node,options = {}){
   const player = players[index];
   if (options.recordUndo !== false) undoStack.push(playerUndoSnapshot());
+  const from = player.pos;
   const result = Engine.advancePlayer(liveState(),index,node);
+  burnLiveEdge(from,node,'player');
   anyStep = true; rovingNode = node;
+  if (shiftArrowsOnArrival(node)) log('Veven vrir seg rundt ' + nodeName(node) + '.');
   if (result.reachedEdge){
     log('Brikke ' + (index === 0 ? 'I' : 'II') + ' når kanten av veven.' + (rulesFor().returnRule === 'sector' ? ' Inngangssektoren og gyldige hjem-eiker markeres.' : ''));
   }
@@ -1266,6 +1568,7 @@ async function movePlayerToTarget(index,path){
   try {
     for (const node of path){
       if (version !== gameVersion || phase !== 'move') break;
+      if (!graph.out[players[index].pos].includes(node)) break;
       const result = applyPlayerStep(index,node,{recordUndo:false,render:false});
       moved++;
       renderAll(); updateHud();
@@ -1277,7 +1580,7 @@ async function movePlayerToTarget(index,path){
     if (version === gameVersion){
       if (phase === 'move' && activeDisc >= 0 && players[activeDisc].steps > 0){
         const name = activeDisc === 0 ? 'I' : 'II';
-        status('Brikke <b>' + name + '</b> er aktiv. Velg et markert mål; tallet viser antall steg.');
+        status('Brikke <b>' + name + '</b> er aktiv. ' + targetHint());
       } else if (phase === 'move'){
         status('Alle tildelte steg er brukt. Avslutt turen når du er klar.');
       }
@@ -1307,7 +1610,7 @@ function selectDisc(index){
   if (rulesFor().returnRule === 'sector' && player.touched){
     status('Brikke <b>' + (index === 0 ? 'I' : 'II') + '</b> valgt. Inngangssektoren er ringet inn; gyldige hjem-eiker lyser ved sentrum.');
   } else {
-    status('Brikke <b>' + (index === 0 ? 'I' : 'II') + '</b> valgt. Velg et markert mål; tallet viser antall steg.');
+    status('Brikke <b>' + (index === 0 ? 'I' : 'II') + '</b> valgt. ' + targetHint());
   }
   renderAll(); renderLegal(); updateHud();
 }
@@ -1353,13 +1656,6 @@ function bindDark(index){
   if (phase === 'move' && activeDisc >= 0) setRovingNode(players[activeDisc].pos,true);
   else $('rollBtn').focus();
 }
-function reverseAdjacencyEdge(adjacency,from,to){
-  const index = adjacency[from].indexOf(to);
-  if (index < 0) return false;
-  adjacency[from].splice(index,1);
-  if (!adjacency[to].includes(from)) adjacency[to].push(from);
-  return true;
-}
 function beginWeaveMode(){
   if (cheats.vev || targetModeActive() || !(phase === 'roll' || phase === 'move')) return;
   weaveMode = true; weaveReturnStatus = latestStatus;
@@ -1381,11 +1677,9 @@ function cancelWeaveMode(announce = true){
 function reverseWeaveEdge(from,to){
   if (!weaveMode) return;
   const edgeIndex = graph.dirEdges.findIndex(edge => edge[0] === from && edge[1] === to);
-  if (edgeIndex < 0 || !reverseAdjacencyEdge(graph.out,from,to)) return;
-  if (!reverseAdjacencyEdge(graph.outSC,to,from)) reverseAdjacencyEdge(graph.outSC,from,to);
-  const kind = graph.dirEdges[edgeIndex][2];
-  graph.dirEdges[edgeIndex] = [to,from,kind];
+  if (edgeIndex < 0 || !reverseGraphEdge(graph,edgeIndex)) return;
   graph.key += ':vev:' + from + ':' + to;
+  graph.baseKey = graph.key;
   finalizeGraph(graph,graph.topology === 'full');
   weaveMode = false; cheats.vev = true;
   drawWeb(graph); renderedGraphKey = graph.key;
@@ -1467,13 +1761,18 @@ function logCaptures(indices,type,landing = false){
   }
 }
 function moveDarkOneLive(choice,adj,matrix){
+  const from = dark[choice.index].pos;
   const result = Engine.moveDarkOne(liveState(),choice.index,choice.target,adj,matrix,rng);
+  if (result.moved) burnLiveEdge(from,result.to,'dark');
   if (result.captured.length) logCaptures(result.captured,dark[choice.index].type,false);
+  if (result.moved) shiftArrowsOnArrival(result.to);
   return result.moved;
 }
 function moveSnakeOneLive(index,adj,matrix,options = {}){
   const result = Engine.moveSnakeOne(liveState(),index,adj,matrix,rng,options);
+  if (result.moved) burnLiveEdge(result.from,result.to,'dark');
   if (result.captured.length) logCaptures(result.captured,'S',false);
+  if (result.moved && shiftArrowsOnArrival(result.to)) log('En slange vrir veven rundt ' + nodeName(result.to) + '.');
   return result.moved;
 }
 async function animateDarkStepLive(choice,adj,matrix,version){
@@ -1497,7 +1796,7 @@ async function animateSnakeStepLive(index,adj,matrix,version,options = {}){
   return {moved:true,cancelled:false};
 }
 async function foxHopLive(index,version){
-  const plan = Engine.planFoxHop(liveState(),index,graph,rng);
+  const plan = Engine.planFoxHop(liveState(),index,graph,rng,{shifting:shiftsOnArrive()});
   if (!plan) return {moved:false,leapt:false};
   const piece = dark[index];
   const startPoint = darkPiecePoint(index,piece.pos);
@@ -1506,7 +1805,9 @@ async function foxHopLive(index,version){
   const finish = result => { clearFoxHopFx(); piece.el.classList.remove('fox-hopping','enemy-moving'); renderAll(); return result; };
   piece.el.classList.add('fox-hopping','enemy-moving');
   renderFoxHopFx(plan,'mid');
+  const hopFrom = piece.pos;
   piece.pos = plan.mid; renderAll();
+  burnLiveEdge(hopFrom,plan.mid,'dark');
   if (!await animateFoxArcSegment(index,startPoint,midPoint,version)) return finish({cancelled:true});
   if (plan.overPlayers.length){
     const names = plan.overPlayers.map(playerIndex => playerIndex === 0 ? 'I' : 'II').join(' og ');
@@ -1515,8 +1816,10 @@ async function foxHopLive(index,version){
 
   renderFoxHopFx(plan,'land');
   piece.pos = plan.land;
+  burnLiveEdge(plan.mid,plan.land,'dark');
   const captured = Engine.captureAt(liveState(),plan.land);
   if (captured.length) logCaptures(captured,'F',true);
+  if (shiftArrowsOnArrival(plan.land)) log('En rev vrir veven rundt ' + nodeName(plan.land) + '.');
   renderAll();
   if (!await animateFoxArcSegment(index,midPoint,landPoint,version)) return finish({cancelled:true});
   return finish({moved:true,leapt:plan.leapt});
@@ -1538,17 +1841,20 @@ async function runSymbolEnemy(version){
   log('Fienden kaster ' + snakeFaces + ' slangeflater og ' + foxFaces + ' revflater' + (dazzled ? ' (blendet).' : '.'));
   updateHud();
 
-  const snakeMovement = symbolSnakeMovement(graph);
+  let snakeMovement = symbolSnakeMovement(graph,shiftsOnArrive());
   const wokenSnakes = new Set();
   for (let activation = 0; activation < snakeFaces && players.some(player => player.alive); activation++){
+    snakeMovement = symbolSnakeMovement(graph,shiftsOnArrive());
     const choice = Engine.choosePursuer(liveState(),(piece,index) => piece.type === 'S' && !piece.bound && !wokenSnakes.has(index) &&
-      Engine.canSnakeMove(liveState(),index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps),snakeMovement.distanceMatrix,rng);
+      Engine.canSnakeMove(liveState(),index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps,snakeMovement.shiftGraph),snakeMovement.distanceMatrix,rng);
     if (!choice) break;
     wokenSnakes.add(choice.index);
     for (let step = 0; step < snakeMovement.maxSteps; step++){
+      snakeMovement = symbolSnakeMovement(graph,shiftsOnArrive());
       const stepResult = await animateSnakeStepLive(choice.index,snakeMovement.adj,snakeMovement.distanceMatrix,version,{
         mustTurn:snakeMovement.mustTurn,
-        remainingSteps:snakeMovement.maxSteps - step
+        remainingSteps:snakeMovement.maxSteps - step,
+        shiftGraph:snakeMovement.shiftGraph
       });
       if (stepResult.cancelled) return false;
       if (!stepResult.moved) break;
@@ -1788,7 +2094,18 @@ function createSimState(modeName,seed){
   };
 }
 function cloneSimState(state){
-  return {...state,players:state.players.map(player => ({...player})),dark:state.dark.map(piece => ({...piece})),powersUsed:{...state.powersUsed}};
+  return {
+    ...state,
+    graph:state.rules.shiftOnArrive ? cloneMutableGraph(state.graph) : (state.graph.burn ? cloneBurnGraph(state.graph) : state.graph),
+    players:state.players.map(player => ({...player})),
+    dark:state.dark.map(piece => ({...piece})),
+    powersUsed:{...state.powersUsed}
+  };
+}
+/* Skiftet skjer bare når et trekk faktisk gjennomføres, aldri under
+   scenariosøket, som prøver og angrer trekk for å score dem. */
+function simShiftOnArrival(state,node){
+  if (state.rules.shiftOnArrive) shiftArrowsAt(state.graph,node);
 }
 function simGoalDistance(player,position,state){
   if (!player.touched) return state.graph.outerDist[position];
@@ -1853,6 +2170,9 @@ function simApplyPlayerStep(state,index,node){
   if (ring6.has(node) && !player.touched){ player.touched = true; player.touchSpoke = spokeOfN(node); }
   if (node === CENTER && player.touched){ player.done = true; player.steps = 0; }
 }
+function simBurnStep(state,from,to,mover){
+  if (state.graph.burn) burnEdge(state.graph,from,to,mover);
+}
 function simMoveDiscGreedy(state,index,steps,random){
   const player = state.players[index];
   player.steps = steps;
@@ -1871,7 +2191,11 @@ function simMoveDiscGreedy(state,index,steps,random){
       else if (Math.abs(score - bestScore) < 1e-9) bestMoves.push(node);
     }
     if (!bestMoves.length) break;
-    simApplyPlayerStep(state,index,random.pick(bestMoves));
+    const chosenNode = random.pick(bestMoves);
+    const from = player.pos;
+    simApplyPlayerStep(state,index,chosenNode);
+    simShiftOnArrival(state,chosenNode);
+    simBurnStep(state,from,chosenNode,'player');
   }
   player.steps = 0;
 }
@@ -1895,6 +2219,7 @@ function simPlayerTurn(state,dice,random){
   const max = Math.max(...scenarios.map(item => item.score));
   const chosen = random.pick(scenarios.filter(item => item.score === max)).candidate;
   state.players = chosen.players;
+  state.graph = chosen.graph;
 }
 function simMinThreat(state){
   let best = 99;
@@ -1918,23 +2243,36 @@ function simUseDefensivePowers(state,powerMask,random){
     state.dazzle = 2; state.powersUsed.mus = true;
   }
 }
-function simMoveDark(state,choice,adj,matrix,random){ return Engine.moveDarkOne(state,choice.index,choice.target,adj,matrix,random).moved; }
-function simMoveSnake(state,index,adj,matrix,random,options = {}){ return Engine.moveSnakeOne(state,index,adj,matrix,random,options).moved; }
+function simMoveDark(state,choice,adj,matrix,random){
+  const from = state.dark[choice.index].pos;
+  const result = Engine.moveDarkOne(state,choice.index,choice.target,adj,matrix,random);
+  if (result.moved){ simShiftOnArrival(state,result.to); simBurnStep(state,from,result.to,'dark'); }
+  return result.moved;
+}
+function simMoveSnake(state,index,adj,matrix,random,options = {}){
+  const result = Engine.moveSnakeOne(state,index,adj,matrix,random,options);
+  if (result.moved){ simShiftOnArrival(state,result.to); simBurnStep(state,result.from,result.to,'dark'); }
+  return result.moved;
+}
 function simEnemySymbols(state,random){
   const dazzled = state.dazzle > 0; if (dazzled) state.dazzle--;
   const dice = dazzled ? 3 : 6;
   let snakeFaces = 0, foxFaces = 0;
   for (let i = 0; i < dice; i++){ const roll = random.int(6); if (roll < 2) snakeFaces++; else if (roll < 4) foxFaces++; }
-  const snakeMovement = symbolSnakeMovement(state.graph);
+  const shifting = Boolean(state.rules.shiftOnArrive);
+  let snakeMovement = symbolSnakeMovement(state.graph,shifting);
   const wokenSnakes = new Set();
   for (let activation = 0; activation < snakeFaces && Engine.activePlayerIndices(state).length; activation++){
+    snakeMovement = symbolSnakeMovement(state.graph,shifting);
     const choice = Engine.choosePursuer(state,(piece,index) => piece.type === 'S' && !piece.bound && !wokenSnakes.has(index) &&
-      Engine.canSnakeMove(state,index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps),snakeMovement.distanceMatrix,random);
+      Engine.canSnakeMove(state,index,snakeMovement.adj,snakeMovement.distanceMatrix,snakeMovement.maxSteps,snakeMovement.shiftGraph),snakeMovement.distanceMatrix,random);
     if (!choice) break; wokenSnakes.add(choice.index);
     for (let step = 0; step < snakeMovement.maxSteps; step++){
+      snakeMovement = symbolSnakeMovement(state.graph,shifting);
       if (!simMoveSnake(state,choice.index,snakeMovement.adj,snakeMovement.distanceMatrix,random,{
         mustTurn:snakeMovement.mustTurn,
-        remainingSteps:snakeMovement.maxSteps - step
+        remainingSteps:snakeMovement.maxSteps - step,
+        shiftGraph:snakeMovement.shiftGraph
       })) break;
       if (!Engine.activePlayerIndices(state).length) break;
     }
@@ -1944,8 +2282,12 @@ function simEnemySymbols(state,random){
     const choice = Engine.choosePursuer(state,(piece,index) => piece.type === 'F' && !piece.bound && !wokenFoxes.has(index),state.graph.dist,random);
     if (!choice) break; wokenFoxes.add(choice.index);
     for (let hop = 0; hop < 2; hop++){
-      const plan = Engine.planFoxHop(state,choice.index,state.graph,random); if (!plan) break;
+      const plan = Engine.planFoxHop(state,choice.index,state.graph,random,{shifting}); if (!plan) break;
+      const hopFrom = state.dark[choice.index].pos;
       state.dark[choice.index].pos = plan.land; Engine.captureAt(state,plan.land);
+      simShiftOnArrival(state,plan.land);
+      simBurnStep(state,hopFrom,plan.mid,'dark');
+      simBurnStep(state,plan.mid,plan.land,'dark');
       if (plan.leapt || !Engine.activePlayerIndices(state).length) break;
     }
   }

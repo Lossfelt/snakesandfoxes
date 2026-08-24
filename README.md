@@ -14,6 +14,8 @@ Målet er å føre to brikker fra sentrum ut til ytterringen og hjem igjen før 
 | v3 Sektor | Som v2, men hjemveien må gå inn fra en fjern sektor etter at brikken har nådd kanten. |
 | v4 Kutt | Som v2, men veven har forskjøvne eikekutt mellom ringene. |
 | v5 Villvev | Enveisretningene trekkes på nytt for hvert spill. Når bare én brikke er aktiv, bruker den den høyeste terningen. |
+| v6 Vevskifte | Som v2, men enveispilene rundt en node snur hver gang en brikke ankommer den. Du flytter én node om gangen, mens fienden planlegger mot veven slik den blir etter sine egne steg. |
+| v7 Brente Broer | Som v2, men ringsegmentene er tynne tråder som brenner opp når en av dine brikker bruker dem. Eikene er tykke, og fienden sliter ikke på veven. |
 
 ## Kreftene
 
@@ -27,7 +29,7 @@ Hver kraft kan brukes én gang per spill:
 
 ## Betjening
 
-* Mus eller berøring: Velg en brikke og deretter en markert målnode. Brikken følger den korteste lovlige ruten dit.
+* Mus eller berøring: Velg en brikke og deretter en markert målnode. Brikken følger den korteste lovlige ruten dit. I v6 markeres bare nabonodene, siden veven skifter for hvert steg.
 * `Tab`: Flytt fokus til brettet.
 * Piltaster: Naviger mellom felt.
 * `Enter` eller mellomrom: Velg en brikke eller målnode.
