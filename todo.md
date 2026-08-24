@@ -10,7 +10,7 @@
   - [X] Ny variant: I det man ankommer en node, så endres enveiskjøringene på de tilknyttede veiene seg. Lagt inn som **v6 Vevskifte**: samme enveiskjøringer som v2 ved start, alle brikker utløser skiftet, det skjer for hvert steg, snuingene er permanente, og spilleren flytter én node om gangen. Fienden planlegger mot veven slik den blir etter sine egne ankomster. Simulert seiersrate 18,4 % (n=500).
   - [ ] Ny variant: Hver sirkel beveger seg ett hakk hver runde, i retning enveiskjøringene.
   - [ ] Ny variant: Test ut ulikt antall noder pr sirkel, slik at det vil være en gevinst å bevege seg innover for å komme raskere rundt til andre siden.
-  - [ ] Ny variant: Et brett hvor noen tråder er tykke (kan brukes hele tiden), og noen er tynne (de ryker etter én gangs bruk og reduserer dermed antall mulige veier). Kanskje det er sirklene som er tynne og eikene tykke?
+  - [X] Ny variant: Et brett hvor noen tråder er tykke (kan brukes hele tiden), og noen er tynne (de ryker etter én gangs bruk og reduserer dermed antall mulige veier). Kanskje det er sirklene som er tynne og eikene tykke? (Implementert som v7 Brente Broer: alle ringsegmenter, også ytterringen, brenner første gang en av spillerens brikker bruker dem; eiker og hjørnelenker er tykke. Fiendens bevegelser brenner ingenting – forsøket på det låste flokken fast, siden slangenes svingregel og revenes sprang krever tråder som da var brent bort.)
 - [ ] En Power som er å kunne kutte én tråd i løpet av spillet.
 - [ ] kan teste at slangene ikke MÅ flytte tre steg, og at revene ikke MÅ bruke to hopp
 - [X] Juster UI, man bør kunne nå knappene for terning og avslutt tur uten å scrolle vekk fra brettet. Kanskje fjern eller flytt noe forklaring.
