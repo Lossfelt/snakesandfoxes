@@ -50,7 +50,7 @@ test("et ringsegment ryker etter én bruk, i begge retninger", () => {
   const graph = burnGraph();
   const from = id["3,0"], to = id["3,1"];
   assert.ok(graph.out[from].includes(to) || graph.out[to].includes(from));
-  assert.equal(burnEdge(graph, from, to), true);
+  assert.equal(burnEdge(graph, from, to, "player"), true);
   assert.equal(isBurnedEdge(graph, from, to), true);
   assert.equal(isBurnedEdge(graph, to, from), true);
   assert.equal(graph.out[from].includes(to), false);
@@ -58,12 +58,12 @@ test("et ringsegment ryker etter én bruk, i begge retninger", () => {
   assert.equal(graph.outSC[from].includes(to), false);
   assert.equal(graph.outSC[to].includes(from), false);
   assert.equal(graph.dirEdges.some(edge => (edge[0] === from && edge[1] === to) || (edge[0] === to && edge[1] === from)), false);
-  assert.equal(burnEdge(graph, from, to), false, "en tråd kan bare brenne opp én gang");
+  assert.equal(burnEdge(graph, from, to, "player"), false, "en tråd kan bare brenne opp én gang");
 });
 
 test("ytterringen er også tynn", () => {
   const graph = burnGraph();
-  assert.equal(burnEdge(graph, id["6,0"], id["6,1"]), true);
+  assert.equal(burnEdge(graph, id["6,0"], id["6,1"], "player"), true);
   assert.equal(graph.out[id["6,0"]].includes(id["6,1"]), false);
 });
 
@@ -71,16 +71,16 @@ test("eiker og hjørnelenker er tykke tråder", () => {
   const graph = burnGraph();
   const inner = id["3,0"], outer = id["4,0"];
   assert.equal(isThinEdge(inner, outer), false);
-  assert.equal(burnEdge(graph, inner, outer), false);
+  assert.equal(burnEdge(graph, inner, outer, "player"), false);
   assert.equal(graph.out[inner].includes(outer), true);
 
   assert.equal(isThinEdge(CENTER, id["1,0"]), false);
-  assert.equal(burnEdge(graph, CENTER, id["1,0"]), false);
+  assert.equal(burnEdge(graph, CENTER, id["1,0"], "player"), false);
   assert.equal(graph.out[CENTER].includes(id["1,0"]), true);
 
   const corner = id.K0, entry = id["6,1"];
   assert.equal(isThinEdge(corner, entry), false);
-  assert.equal(burnEdge(graph, corner, entry), false);
+  assert.equal(burnEdge(graph, corner, entry, "player"), false);
   assert.equal(graph.out[corner].includes(entry), true);
 });
 
@@ -88,7 +88,7 @@ test("ingen node blir innelåst selv om alle ringtråder brenner", () => {
   const graph = burnGraph();
   for (let ring = 1; ring <= 6; ring++){
     for (let spoke = 0; spoke < 12; spoke++){
-      burnEdge(graph, id[ring + "," + spoke], id[ring + "," + ((spoke + 1) % 12)]);
+      burnEdge(graph, id[ring + "," + spoke], id[ring + "," + ((spoke + 1) % 12)], "player");
     }
   }
   assert.equal(graph.burned.size, 72);
@@ -109,13 +109,22 @@ test("brente tråder finnes ikke i lovlige trekk for spilleren", () => {
   };
   const before = Engine.legalMoves(state, 0, RULESETS.brenteBroer, graph);
   assert.ok(before.includes(id["3,1"]));
-  burnEdge(graph, id["3,0"], id["3,1"]);
+  burnEdge(graph, id["3,0"], id["3,1"], "player");
   const after = Engine.legalMoves(state, 0, RULESETS.brenteBroer, graph);
   assert.equal(after.includes(id["3,1"]), false);
   assert.ok(after.includes(id["4,0"]), "eiken utover skal fortsatt være lovlig");
 });
 
-test("en slange kan ikke gå tilbake over tråden den nettopp brant", () => {
+test("fiendens bevegelser brenner ingen tråder", () => {
+  const graph = burnGraph();
+  const from = id["3,0"], to = id["3,1"];
+  assert.equal(burnEdge(graph, from, to, "dark"), false, "slanger og rever sliter ikke på veven");
+  assert.equal(isBurnedEdge(graph, from, to), false);
+  assert.equal(graph.out[from].includes(to) || graph.out[to].includes(from), true);
+  assert.equal(burnEdge(graph, from, to, "player"), true, "spilleren brenner den samme tråden");
+});
+
+test("fienden kan ikke bruke en tråd spilleren har brent", () => {
   const graph = burnGraph();
   const state = {
     players:[{pos:id["1,3"],alive:true,done:false,touched:false,steps:0,touchSpoke:-1}],
@@ -136,7 +145,7 @@ test("en slange kan ikke gå tilbake over tråden den nettopp brant", () => {
 test("kopiert vev brenner uavhengig av originalen", () => {
   const graph = burnGraph();
   const copy = cloneBurnGraph(graph);
-  assert.equal(burnEdge(copy, id["2,0"], id["2,1"]), true);
+  assert.equal(burnEdge(copy, id["2,0"], id["2,1"], "player"), true);
   assert.equal(isBurnedEdge(copy, id["2,0"], id["2,1"]), true);
   assert.equal(isBurnedEdge(graph, id["2,0"], id["2,1"]), false);
   assert.equal(graph.out[id["2,0"]].includes(id["2,1"]) || graph.out[id["2,1"]].includes(id["2,0"]), true);
@@ -146,6 +155,6 @@ test("andre regelsett har ingen brennbare tråder", () => {
   for (const name of ["symbol","kutt","villvev"]){
     const graph = graphForMode(name, 99, true);
     assert.notEqual(graph.burn, true);
-    assert.equal(burnEdge(graph, id["3,0"], id["3,1"]), false);
+    assert.equal(burnEdge(graph, id["3,0"], id["3,1"], "player"), false);
   }
 });
