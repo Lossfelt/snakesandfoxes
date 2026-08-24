@@ -7,7 +7,7 @@
   - Delvis seier med juks: én brikke slapp ut med juks (antall regler brutt er en ytterligere gradering)
   - Tap: begge brikkene ble tatt
 - [ ] Juster videre på variantene, evt lage nye, for å til slutt finne den beste som så blir hovedversjonen
-  - [X] Ny variant: I det man ankommer en node, så endres enveiskjøringene på de tilknyttede veiene seg.
+  - [X] Ny variant: I det man ankommer en node, så endres enveiskjøringene på de tilknyttede veiene seg. Lagt inn som **v6 Vevskifte**: samme enveiskjøringer som v2 ved start, alle brikker utløser skiftet, det skjer for hvert steg, snuingene er permanente, og spilleren flytter én node om gangen. Fienden planlegger mot veven slik den blir etter sine egne ankomster. Simulert seiersrate 18,4 % (n=500).
   - [ ] Ny variant: Hver sirkel beveger seg ett hakk hver runde, i retning enveiskjøringene.
   - [ ] Ny variant: Test ut ulikt antall noder pr sirkel, slik at det vil være en gevinst å bevege seg innover for å komme raskere rundt til andre siden.
   - [ ] Ny variant: Et brett hvor noen tråder er tykke (kan brukes hele tiden), og noen er tynne (de ryker etter én gangs bruk og reduserer dermed antall mulige veier). Kanskje det er sirklene som er tynne og eikene tykke?
