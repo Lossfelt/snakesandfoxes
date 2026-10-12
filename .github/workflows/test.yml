@@ -14,10 +14,9 @@ jobs:
       - name: Oppsett Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
-
+          node-version-file: .nvmrc
       - name: Kjør tester
-        run: node --test tests/
+        run: node --test "tests/*.test.js"
 
   # Fletter Dependabot-PR-er automatisk når CI er grønn, men bare minor- og
   # patch-oppdateringer. Major-hopp (også sikkerhetsoppdateringer som er
