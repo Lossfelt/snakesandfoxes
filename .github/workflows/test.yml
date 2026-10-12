@@ -14,8 +14,7 @@ jobs:
       - name: Oppsett Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
-
+          node-version-file: .nvmrc
       - name: Kjør tester
         run: node --test tests/
 
