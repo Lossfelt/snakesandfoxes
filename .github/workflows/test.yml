@@ -16,7 +16,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Kjør tester
-        run: node --test tests/
+        run: node --test "tests/*.test.js"
 
   # Fletter Dependabot-PR-er automatisk når CI er grønn, men bare minor- og
   # patch-oppdateringer. Major-hopp (også sikkerhetsoppdateringer som er
